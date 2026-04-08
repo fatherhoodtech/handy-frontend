@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/auth/AuthContext'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -13,12 +14,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 function SignInPage() {
+  const { login, isAuthenticated, isLoading } = useAuth()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     rememberMe: false,
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   function handleChange(event) {
     const { name, value, type, checked } = event.target
@@ -28,9 +32,30 @@ function SignInPage() {
     }))
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
-    navigate('/dashboard')
+    setIsSubmitting(true)
+    setErrorMessage('')
+    try {
+      await login(formData.email, formData.password)
+      navigate('/dashboard')
+    } catch (error) {
+      setErrorMessage(error?.message || 'Unable to sign in')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <main className="theme flex min-h-screen items-center justify-center bg-black text-zinc-200">
+        Loading...
+      </main>
+    )
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />
   }
 
   return (
@@ -126,10 +151,19 @@ function SignInPage() {
                   </a>
                 </div>
 
-                <Button type="submit" className="h-11 w-full bg-zinc-950 font-bold tracking-wide text-white hover:bg-black">
-                  Sign In
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="h-11 w-full bg-zinc-950 font-bold tracking-wide text-white hover:bg-black disabled:opacity-70">
+                  {isSubmitting ? 'Signing In...' : 'Sign In'}
                 </Button>
               </form>
+
+              {errorMessage && (
+                <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  {errorMessage}
+                </p>
+              )}
 
               <div className="mt-6 border-t border-zinc-300 pt-4">
                 <p className="text-xs font-medium text-zinc-600">
