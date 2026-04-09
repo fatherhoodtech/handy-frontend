@@ -22,12 +22,19 @@ export async function apiRequest(path, options = {}) {
   })
 
   if (!response.ok) {
+    const raw = await response.text()
     let message = 'Request failed'
     try {
-      const body = await response.json()
+      const body = raw ? JSON.parse(raw) : {}
       message = body?.message || body?.error || message
     } catch {
-      // no-op: keep generic message when response is not JSON
+      if (response.status === 502 || response.status === 504) {
+        message =
+          `Cannot reach the quote engine (HTTP ${response.status}). ` +
+          `Start the API and ensure VITE_API_PROXY_TARGET matches its port (default http://127.0.0.1:8080).`
+      } else if (raw.trim().length > 0 && raw.length < 280) {
+        message = raw.trim()
+      }
     }
     const error = new Error(message)
     error.status = response.status
