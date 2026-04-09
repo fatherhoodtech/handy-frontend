@@ -2,33 +2,37 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { apiRequest } from '@/lib/apiClient'
 
-const projectCards = [
-  { title: 'Kitchen Remodel', subtitle: '14 tasks', progress: 72, className: 'bg-violet-600 text-white' },
-  { title: 'HVAC Upgrade', subtitle: '9 tasks', progress: 48, className: 'bg-sky-300 text-zinc-900' },
-  { title: 'Roof Repair', subtitle: '6 tasks', progress: 85, className: 'bg-orange-400 text-zinc-900' },
-]
-
-const todaysTasks = [
-  { title: 'Call new leads', subtitle: '3 homeowners to contact', color: 'bg-orange-400' },
-  { title: 'Review pending quotes', subtitle: 'Finalize 2 draft quotes', color: 'bg-violet-500' },
-  { title: 'Customer follow-up', subtitle: 'Send status updates', color: 'bg-sky-400' },
-]
-
-const stats = [
-  { label: 'Tracked hours', value: '28h' },
-  { label: 'Closed deals', value: '18' },
-  { label: 'Response rate', value: '89%' },
-]
+function formatMoney(cents) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100)
+}
 
 function OverviewPage() {
   const [overviewMessage, setOverviewMessage] = useState('')
+  const [alerts, setAlerts] = useState([])
+  const [metrics, setMetrics] = useState({
+    quotesCreatedToday: 0,
+    quotesApprovedToday: 0,
+    draftsOpen: 0,
+    approvedTotal: 0,
+    quoteValueTodayCents: 0,
+    approvedValueTodayCents: 0,
+    opportunitiesOpen: 0,
+    contactsTotal: 0,
+  })
 
   useEffect(() => {
     let cancelled = false
     async function loadOverview() {
       try {
-        const result = await apiRequest('/api/sales/overview')
-        if (!cancelled) setOverviewMessage(result.message)
+        const [overview, notifications] = await Promise.all([
+          apiRequest('/api/sales/overview'),
+          apiRequest('/api/sales/notifications?limit=5'),
+        ])
+        if (!cancelled) {
+          setOverviewMessage(overview.message)
+          setAlerts(Array.isArray(notifications?.items) ? notifications.items : [])
+          if (overview?.metrics) setMetrics(overview.metrics)
+        }
       } catch {
         if (!cancelled) setOverviewMessage('Overview data is currently unavailable.')
       }
@@ -45,52 +49,93 @@ function OverviewPage() {
         {overviewMessage || 'Welcome back. Here is your sales snapshot for today.'}
       </p>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {projectCards.map((card) => (
-          <Card key={card.title} className={`border-0 ${card.className}`}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-bold">{card.title}</CardTitle>
-              <CardDescription className="text-current/80">{card.subtitle}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-2 rounded-full bg-white/30">
-                <div className="h-2 rounded-full bg-white/90" style={{ width: `${card.progress}%` }} />
-              </div>
-              <p className="mt-2 text-xs font-semibold">{card.progress}% complete</p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="border-zinc-200 bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-zinc-600">Quotes Created Today</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-zinc-900">{metrics.quotesCreatedToday}</p>
+            <p className="text-xs text-zinc-500">All newly created selected quotes today</p>
+          </CardContent>
+        </Card>
+        <Card className="border-zinc-200 bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-zinc-600">Quotes Approved Today</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-zinc-900">{metrics.quotesApprovedToday}</p>
+            <p className="text-xs text-zinc-500">Approved and ready for follow-up</p>
+          </CardContent>
+        </Card>
+        <Card className="border-zinc-200 bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-zinc-600">Quote Value Today</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-zinc-900">{formatMoney(metrics.quoteValueTodayCents)}</p>
+            <p className="text-xs text-zinc-500">Total created quote value today</p>
+          </CardContent>
+        </Card>
+        <Card className="border-zinc-200 bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-zinc-600">Approved Value Today</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-zinc-900">{formatMoney(metrics.approvedValueTodayCents)}</p>
+            <p className="text-xs text-zinc-500">Approved quote value today</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         <Card className="border-zinc-200 bg-white">
           <CardHeader>
-            <CardTitle>Tasks for today</CardTitle>
-            <CardDescription>Focus queue for the sales team.</CardDescription>
+            <CardTitle>System Status</CardTitle>
+            <CardDescription>Current state of sales operations.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {todaysTasks.map((task) => (
-              <div key={task.title} className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3">
-                <span className={`mt-1 h-3 w-3 rounded-full ${task.color}`} />
-                <div>
-                  <p className="font-medium text-zinc-900">{task.title}</p>
-                  <p className="text-sm text-zinc-600">{task.subtitle}</p>
-                </div>
-              </div>
-            ))}
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-zinc-200 p-3">
+              <p className="text-xs text-zinc-500">Draft Quotes Open</p>
+              <p className="text-2xl font-bold text-zinc-900">{metrics.draftsOpen}</p>
+            </div>
+            <div className="rounded-lg border border-zinc-200 p-3">
+              <p className="text-xs text-zinc-500">Approved Quotes Total</p>
+              <p className="text-2xl font-bold text-zinc-900">{metrics.approvedTotal}</p>
+            </div>
+            <div className="rounded-lg border border-zinc-200 p-3">
+              <p className="text-xs text-zinc-500">Open Opportunities</p>
+              <p className="text-2xl font-bold text-zinc-900">{metrics.opportunitiesOpen}</p>
+            </div>
+            <div className="rounded-lg border border-zinc-200 p-3">
+              <p className="text-xs text-zinc-500">Active Contacts</p>
+              <p className="text-2xl font-bold text-zinc-900">{metrics.contactsTotal}</p>
+            </div>
+            <div className="rounded-lg border border-zinc-200 p-3 sm:col-span-2">
+              <p className="text-xs text-zinc-500">Conversion Signal (today)</p>
+              <p className="text-2xl font-bold text-zinc-900">
+                {metrics.quotesCreatedToday > 0
+                  ? `${Math.round((metrics.quotesApprovedToday / metrics.quotesCreatedToday) * 100)}%`
+                  : '0%'}
+              </p>
+              <p className="text-xs text-zinc-500">Approved today / created today</p>
+            </div>
           </CardContent>
         </Card>
 
         <Card className="border-zinc-200 bg-white">
           <CardHeader>
-            <CardTitle>Statistics</CardTitle>
-            <CardDescription>Daily operational metrics.</CardDescription>
+            <CardTitle>Alerts</CardTitle>
+            <CardDescription>Recent workflow notifications.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-            {stats.map((stat) => (
-              <div key={stat.label} className="rounded-lg border border-zinc-200 p-3">
-                <p className="text-2xl font-bold text-zinc-900">{stat.value}</p>
-                <p className="text-xs text-zinc-500">{stat.label}</p>
+          <CardContent className="space-y-3">
+            {alerts.length === 0 ? (
+              <p className="text-sm text-zinc-500">No recent alerts.</p>
+            ) : alerts.map((item) => (
+              <div key={item.id} className="rounded-lg border border-zinc-200 p-3">
+                <p className="font-medium text-zinc-900">{item.title}</p>
+                <p className="text-sm text-zinc-600">{item.body}</p>
+                <p className="mt-1 text-xs text-zinc-500">{new Date(item.createdAt).toLocaleString()}</p>
               </div>
             ))}
           </CardContent>

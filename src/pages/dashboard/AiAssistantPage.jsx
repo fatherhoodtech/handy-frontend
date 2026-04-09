@@ -653,6 +653,9 @@ function AiAssistantPage() {
     try {
       const response = await apiRequest('/api/sales/ai-assistant/draft/approve', { method: 'POST' })
       const quoteId = String(response?.quote?.id ?? '')
+      const syncStatus = String(response?.jobberSync?.status ?? '')
+      const syncError = String(response?.jobberSync?.error ?? '')
+      const jobberQuoteId = String(response?.jobberSync?.jobberQuoteId ?? '')
       const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
       setMessages(normalizeMessages(resetResponse?.messages))
       if (resetResponse?.quoteDraft) setQuoteDraft(recalcDraft(resetResponse.quoteDraft))
@@ -665,9 +668,13 @@ function AiAssistantPage() {
       setLaborTradeSuggestions([])
       setActiveLaborTradeRow(-1)
       setActionNotice(
-        quoteId
-          ? `Quote approved and saved (${quoteId.slice(0, 8)}). Started a new blank draft.`
-          : 'Quote approved and saved. Started a new blank draft.'
+        syncStatus === 'synced'
+          ? `Quote approved (${quoteId.slice(0, 8)}) and synced to Jobber${jobberQuoteId ? ` (${jobberQuoteId.slice(0, 10)})` : ''}. Started a new blank draft.`
+          : syncStatus === 'failed'
+            ? `Quote approved locally (${quoteId.slice(0, 8)}), but Jobber sync failed${syncError ? `: ${syncError}` : '.'} Started a new blank draft.`
+            : quoteId
+              ? `Quote approved and saved (${quoteId.slice(0, 8)}). Started a new blank draft.`
+              : 'Quote approved and saved. Started a new blank draft.'
       )
       requestAnimationFrame(() => scrollToLatest('auto'))
     } catch (error) {

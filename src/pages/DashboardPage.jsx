@@ -1,4 +1,5 @@
 import {
+  Bell,
   Bot,
   ClipboardList,
   FilePlus2,
@@ -14,8 +15,15 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthContext'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useEffect, useState } from 'react'
+import { apiRequest } from '@/lib/apiClient'
 
 function DashboardPage() {
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [notificationError, setNotificationError] = useState('')
+
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
@@ -52,13 +60,38 @@ function DashboardPage() {
     { label: 'Create Quote', icon: FilePlus2, to: '/dashboard/quotes' },
     { label: 'Log Follow-up', icon: PhoneCall, to: '/dashboard/contacts' },
   ]
-  const activityFeed = [
-    { text: 'Sara updated quote Q-2051', time: '2m ago' },
-    { text: 'New lead from website form', time: '14m ago' },
-    { text: 'Quote Q-2048 approved by customer', time: '31m ago' },
-    { text: 'Follow-up logged for John Carter', time: '1h ago' },
-    { text: 'Mia Rodriguez moved to Contacted', time: '2h ago' },
-  ]
+  const activityFeed = notifications.slice(0, 5).map((item) => ({
+    text: item.title,
+    time: new Date(item.createdAt).toLocaleTimeString(),
+  }))
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadNotifications() {
+      try {
+        const response = await apiRequest('/api/sales/notifications?limit=50')
+        if (cancelled) return
+        setNotifications(Array.isArray(response?.items) ? response.items : [])
+        setUnreadCount(Number(response?.unreadCount || 0))
+      } catch (error) {
+        if (!cancelled) setNotificationError(error?.message || 'Failed to load notifications')
+      }
+    }
+    void loadNotifications()
+    return () => {
+      cancelled = true
+    }
+  }, [location.pathname])
+
+  async function markAllRead() {
+    try {
+      await apiRequest('/api/sales/notifications/read-all', { method: 'PATCH' })
+      setNotifications((current) => current.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })))
+      setUnreadCount(0)
+    } catch (error) {
+      setNotificationError(error?.message || 'Failed to mark notifications as read')
+    }
+  }
 
   async function handleLogout() {
     await logout()
@@ -103,8 +136,21 @@ function DashboardPage() {
 
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden p-6 sm:p-8">
           <div className="mb-6 mt-10">
-            <h1 className="text-3xl font-bold tracking-tight">{pageHeading}</h1>
-            <p className="mt-1 text-zinc-500">{pageSubtitle}</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">{pageHeading}</h1>
+                <p className="mt-1 text-zinc-500">{pageSubtitle}</p>
+              </div>
+              <Button type="button" variant="outline" className="relative" onClick={() => setIsNotificationsOpen(true)}>
+                <Bell className="mr-2 h-4 w-4" />
+                Notifications
+                {unreadCount > 0 ? (
+                  <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                ) : null}
+              </Button>
+            </div>
           </div>
           <div className="min-h-0 flex-1 overflow-hidden">
             <Outlet />
@@ -147,6 +193,11 @@ function DashboardPage() {
           <div>
             <h3 className="mb-3 font-semibold text-zinc-900">Activity Feed</h3>
             <div className="space-y-2">
+              {activityFeed.length === 0 ? (
+                <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                  <p className="text-sm text-zinc-500">No recent activity yet.</p>
+                </div>
+              ) : null}
               {activityFeed.map((item) => (
                 <div key={`${item.text}-${item.time}`} className="rounded-xl border border-zinc-200 bg-white p-3">
                   <p className="text-sm font-medium text-zinc-900">{item.text}</p>
@@ -157,6 +208,38 @@ function DashboardPage() {
           </div>
         </aside>
       </div>
+      {isNotificationsOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-4 shadow-lg">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold text-zinc-900">Notifications</h2>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={markAllRead}>
+                  Mark all read
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setIsNotificationsOpen(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+            {notificationError ? <p className="mb-2 text-sm text-red-600">{notificationError}</p> : null}
+            <div className="max-h-96 space-y-2 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <p className="text-sm text-zinc-500">No notifications yet.</p>
+              ) : notifications.map((item) => (
+                <div key={item.id} className="rounded-lg border border-zinc-200 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
+                    {!item.readAt ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-700">Unread</span> : null}
+                  </div>
+                  <p className="mt-1 text-sm text-zinc-700">{item.body}</p>
+                  <p className="mt-1 text-xs text-zinc-500">{new Date(item.createdAt).toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }

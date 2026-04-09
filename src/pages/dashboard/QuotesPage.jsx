@@ -33,7 +33,10 @@ function QuotesPage() {
   const [selectedQuote, setSelectedQuote] = useState(null)
   const [isLoadingQuoteDetail, setIsLoadingQuoteDetail] = useState(false)
   const [isDeletingQuoteId, setIsDeletingQuoteId] = useState('')
+  const [isRetryingJobberQuoteId, setIsRetryingJobberQuoteId] = useState('')
   const [deleteQuoteTarget, setDeleteQuoteTarget] = useState(null)
+  const [syncNotice, setSyncNotice] = useState('')
+  const [jobberReadinessByQuoteId, setJobberReadinessByQuoteId] = useState({})
 
   useEffect(() => {
     let cancelled = false
@@ -42,7 +45,23 @@ function QuotesPage() {
         setIsLoading(true)
         const response = await apiRequest('/api/sales/quotes')
         if (cancelled) return
-        setQuotes(Array.isArray(response?.quotes) ? response.quotes : [])
+        const loadedQuotes = Array.isArray(response?.quotes) ? response.quotes : []
+        setQuotes(loadedQuotes)
+        const readinessEntries = await Promise.all(
+          loadedQuotes.map(async (quote) => {
+            try {
+              const readinessRes = await apiRequest(
+                `/api/sales/quotes/${encodeURIComponent(quote.id)}/jobber-readiness`
+              )
+              return [quote.id, readinessRes?.readiness ?? { ready: false, missingFields: [] }]
+            } catch {
+              return [quote.id, { ready: false, missingFields: [] }]
+            }
+          })
+        )
+        if (!cancelled) {
+          setJobberReadinessByQuoteId(Object.fromEntries(readinessEntries))
+        }
       } catch (err) {
         if (cancelled) return
         setError(err?.message || 'Failed to load quotes')
@@ -72,6 +91,7 @@ function QuotesPage() {
   async function openQuoteDetail(quoteId) {
     try {
       setError('')
+      setSyncNotice('')
       setIsLoadingQuoteDetail(true)
       const response = await apiRequest(`/api/sales/quotes/${encodeURIComponent(quoteId)}`)
       setSelectedQuote(response?.quote ?? null)
@@ -87,6 +107,7 @@ function QuotesPage() {
   }
 
   function openDeleteQuoteModal(quote) {
+    setSyncNotice('')
     setDeleteQuoteTarget(quote)
   }
 
@@ -107,6 +128,57 @@ function QuotesPage() {
       setError(err?.message || 'Failed to delete quote')
     } finally {
       setIsDeletingQuoteId('')
+    }
+  }
+
+  async function handleRetryJobberSync(quoteId) {
+    try {
+      setError('')
+      setSyncNotice('')
+      setIsRetryingJobberQuoteId(quoteId)
+      const retryResponse = await apiRequest(`/api/sales/quotes/${encodeURIComponent(quoteId)}/retry-jobber-sync`, {
+        method: 'POST',
+      })
+      const retryStatus = String(retryResponse?.jobberSync?.status ?? '')
+      const retryError = String(retryResponse?.jobberSync?.error ?? '')
+      const remoteId = String(retryResponse?.jobberSync?.jobberQuoteId ?? '')
+      const reasonCategory = String(retryResponse?.jobberSync?.reasonCategory ?? '')
+      const missingFields = Array.isArray(retryResponse?.jobberSync?.missingFields)
+        ? retryResponse.jobberSync.missingFields
+        : []
+      const [quotesResponse, detailResponse] = await Promise.all([
+        apiRequest('/api/sales/quotes'),
+        apiRequest(`/api/sales/quotes/${encodeURIComponent(quoteId)}`),
+      ])
+      setQuotes(Array.isArray(quotesResponse?.quotes) ? quotesResponse.quotes : [])
+      setSelectedQuote(detailResponse?.quote ?? null)
+      if (retryStatus === 'synced') {
+        setSyncNotice(
+          remoteId
+            ? `Jobber sync succeeded. Quote created in Jobber (${remoteId}).`
+            : 'Jobber sync succeeded. Quote created in Jobber.'
+        )
+      } else if (retryStatus === 'failed') {
+        if (reasonCategory === 'preflight_validation_failed') {
+          setSyncNotice(
+            missingFields.length > 0
+              ? `Jobber preflight failed. Missing required fields: ${missingFields.join(', ')}.`
+              : `Jobber preflight failed${retryError ? `: ${retryError}` : '.'}`
+          )
+        } else if (reasonCategory === 'property_resolution_failed') {
+          setSyncNotice(
+            `Jobber sync failed: Client exists in Jobber but no usable property was found. Open that client in Jobber, confirm at least one service property/address exists, then retry.`
+          )
+        } else {
+          setSyncNotice(`Jobber sync failed${retryError ? `: ${retryError}` : '.'}`)
+        }
+      } else {
+        setSyncNotice('Jobber sync request finished. Refreshing status...')
+      }
+    } catch (err) {
+      setError(err?.message || 'Failed to retry Jobber sync')
+    } finally {
+      setIsRetryingJobberQuoteId('')
     }
   }
 
@@ -160,6 +232,9 @@ function QuotesPage() {
                     Status
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                    Jobber
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
                     Created
                   </th>
                 </tr>
@@ -195,6 +270,19 @@ function QuotesPage() {
                         {quote.status === 'draft' ? 'Draft' : 'Approved'}
                       </span>
                     </td>
+                    <td className="cursor-pointer px-4 py-3 text-xs" onClick={() => openQuoteDetail(quote.id)}>
+                      {quote.jobberSyncStatus === 'synced' ? (
+                        <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">Synced</span>
+                      ) : quote.jobberSyncStatus === 'failed' ? (
+                        <span className="inline-flex rounded-full bg-red-100 px-2 py-1 font-semibold text-red-700">Failed</span>
+                      ) : jobberReadinessByQuoteId[quote.id]?.ready ? (
+                        <span className="inline-flex rounded-full bg-sky-100 px-2 py-1 font-semibold text-sky-700">Ready</span>
+                      ) : quote.status === 'approved' ? (
+                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700">Pending</span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-zinc-100 px-2 py-1 font-semibold text-zinc-600">N/A</span>
+                      )}
+                    </td>
                     <td
                       className="cursor-pointer whitespace-nowrap px-4 py-3 text-sm text-zinc-600"
                       onClick={() => openQuoteDetail(quote.id)}>
@@ -221,11 +309,48 @@ function QuotesPage() {
             <p className="text-sm text-zinc-500">Loading quote details...</p>
           ) : selectedQuote ? (
             <div className="space-y-3">
+              {syncNotice ? (
+                <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700">
+                  {syncNotice}
+                </p>
+              ) : null}
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <p className="text-sm text-zinc-700"><span className="font-semibold">Client:</span> {selectedQuote.client}</p>
                 <p className="text-sm text-zinc-700"><span className="font-semibold">Status:</span> {selectedQuote.status}</p>
                 <p className="text-sm text-zinc-700"><span className="font-semibold">Price:</span> {formatMoneyFromCents(selectedQuote.amountCents)}</p>
                 <p className="text-sm text-zinc-700"><span className="font-semibold">Created:</span> {new Date(selectedQuote.createdAt).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-zinc-800">Jobber Sync</p>
+                <p className="text-sm text-zinc-700">
+                  {selectedQuote.jobberSyncStatus === 'synced'
+                    ? `Synced${selectedQuote.jobberQuoteId ? ` (Quote ID: ${selectedQuote.jobberQuoteId})` : ''}`
+                    : selectedQuote.jobberSyncStatus === 'failed'
+                      ? `Failed${selectedQuote.jobberLastError ? `: ${selectedQuote.jobberLastError}` : ''}`
+                      : selectedQuote.status === 'approved'
+                        ? 'Pending'
+                        : 'N/A'}
+                </p>
+                {selectedQuote.jobberSyncStatus === 'failed' &&
+                String(selectedQuote.jobberLastError ?? '').toLowerCase().includes('property') ? (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Client exists in Jobber, but property resolution failed. Open that client in Jobber and confirm at least one property/service address exists.
+                  </p>
+                ) : null}
+                {selectedQuote.jobberSyncStatus === 'failed' &&
+                String(selectedQuote.jobberLastError ?? '').toLowerCase().includes('missing required fields for jobber sync') ? (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Required client/address/quote fields are missing. Update the quote or contact data first, then retry Jobber sync.
+                  </p>
+                ) : null}
+                {jobberReadinessByQuoteId[selectedQuote.id] &&
+                !jobberReadinessByQuoteId[selectedQuote.id].ready &&
+                Array.isArray(jobberReadinessByQuoteId[selectedQuote.id].missingFields) &&
+                jobberReadinessByQuoteId[selectedQuote.id].missingFields.length > 0 ? (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Missing for Jobber: {jobberReadinessByQuoteId[selectedQuote.id].missingFields.join(', ')}
+                  </p>
+                ) : null}
               </div>
               <div>
                 <p className="text-sm font-semibold text-zinc-800">Title</p>
@@ -270,6 +395,15 @@ function QuotesPage() {
                     ? 'Continue This Draft in AI Assistant'
                     : 'Edit Again in AI Assistant'}
                 </Button>
+                {selectedQuote.status === 'approved' && selectedQuote.jobberSyncStatus !== 'synced' ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleRetryJobberSync(selectedQuote.id)}
+                    disabled={isRetryingJobberQuoteId === selectedQuote.id}>
+                    {isRetryingJobberQuoteId === selectedQuote.id ? 'Retrying Jobber Sync...' : 'Retry Jobber Sync'}
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"
