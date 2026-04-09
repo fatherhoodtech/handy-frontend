@@ -1,4 +1,15 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"
+function resolveApiBaseUrl() {
+  const raw = import.meta.env.VITE_API_BASE_URL
+  if (raw !== undefined && String(raw).trim() !== '') {
+    return String(raw).replace(/\/$/, '')
+  }
+  if (import.meta.env.DEV) {
+    return ''
+  }
+  return 'http://localhost:8080'
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 
 export async function apiRequest(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
