@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
-import { History } from 'lucide-react'
+import { Copy, History, UserCircle2 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 function toInt(value) {
@@ -35,11 +35,13 @@ function recalcDraft(draft) {
     const isLabor = item.itemType === 'labor'
     const quantity = isLabor ? toInt(item.hours) : toInt(item.quantity)
     const unitPriceCents = isLabor ? toInt(item.hourlyRateCents) : toInt(item.unitPriceCents)
+    const next = { ...item }
+    delete next.productOrServiceName
     return {
-      ...item,
-      productOrServiceName: isLabor
+      ...next,
+      materialName: isLabor
         ? buildLaborLabel(item.trade, item.expertiseLevel)
-        : String(item.productOrServiceName ?? ''),
+        : String(item.materialName ?? item.productOrServiceName ?? ''),
       quantity,
       unitPriceCents,
       totalPriceCents: quantity * unitPriceCents,
@@ -99,6 +101,359 @@ function createDefaultQuoteDraft() {
   })
 }
 
+function tryParseJson(str) {
+  try {
+    return JSON.parse(str)
+  } catch {
+    return null
+  }
+}
+
+/** Extract first parseable JSON object/array from assistant text (plain, fenced, or embedded). */
+function extractEmbeddedJson(text) {
+  const trimmed = String(text ?? '').trim()
+  if (!trimmed) return null
+
+  let v = tryParseJson(trimmed)
+  if (v !== null && (typeof v === 'object' || Array.isArray(v)))
+    return { value: v, raw: trimmed, preamble: '', postamble: '' }
+
+  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fenceMatch?.[1]) {
+    const inner = fenceMatch[1].trim()
+    v = tryParseJson(inner)
+    if (v !== null && (typeof v === 'object' || Array.isArray(v))) {
+      const full = fenceMatch[0]
+      const idx = trimmed.indexOf(full)
+      return {
+        value: v,
+        raw: inner,
+        preamble: idx > 0 ? trimmed.slice(0, idx).trim() : '',
+        postamble: idx >= 0 ? trimmed.slice(idx + full.length).trim() : '',
+      }
+    }
+  }
+
+  const start = trimmed.indexOf('{')
+  const end = trimmed.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    const candidate = trimmed.slice(start, end + 1)
+    v = tryParseJson(candidate)
+    if (v !== null && typeof v === 'object' && !Array.isArray(v))
+      return {
+        value: v,
+        raw: candidate,
+        preamble: trimmed.slice(0, start).trim(),
+        postamble: trimmed.slice(end + 1).trim(),
+      }
+  }
+
+  const arrStart = trimmed.indexOf('[')
+  const arrEnd = trimmed.lastIndexOf(']')
+  if (arrStart >= 0 && arrEnd > arrStart) {
+    const candidate = trimmed.slice(arrStart, arrEnd + 1)
+    v = tryParseJson(candidate)
+    if (v !== null && Array.isArray(v))
+      return {
+        value: v,
+        raw: candidate,
+        preamble: trimmed.slice(0, arrStart).trim(),
+        postamble: trimmed.slice(arrEnd + 1).trim(),
+      }
+  }
+
+  return null
+}
+
+function isQuoteLikePayload(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false
+  const qd = obj.quoteDraft
+  if (qd && typeof qd === 'object' && !Array.isArray(qd)) {
+    if (Array.isArray(qd.lineItems)) return true
+    if (qd.clientView && typeof qd.clientView === 'object') return true
+  }
+  if (Array.isArray(obj.lineItems)) return true
+  if (obj.clientView && typeof obj.clientView === 'object' && (obj.title != null || obj.quoteDescription != null))
+    return true
+  return false
+}
+
+/** Map API / AI JSON into a draft shape compatible with recalcDraft. */
+function normalizeInboundQuoteDraft(raw) {
+  const base = createDefaultQuoteDraft()
+  const src =
+    raw && typeof raw === 'object' && !Array.isArray(raw) && raw.quoteDraft && typeof raw.quoteDraft === 'object'
+      ? raw.quoteDraft
+      : raw
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return null
+
+  const lineItems = Array.isArray(src.lineItems)
+    ? src.lineItems.map((line) => {
+        const item = line || {}
+        const isLabor = item.itemType === 'labor'
+        if (isLabor) {
+          const hours = toInt(item.hours) || 1
+          const hourlyRateCents = toInt(item.hourlyRateCents)
+          return {
+            itemType: 'labor',
+            trade: String(item.trade ?? 'general_handyman'),
+            expertiseLevel: String(item.expertiseLevel ?? 'standard'),
+            hours,
+            hourlyRateCents,
+            materialName: buildLaborLabel(item.trade, item.expertiseLevel),
+            quantity: 1,
+            unitPriceCents: hourlyRateCents,
+            totalPriceCents: hours * hourlyRateCents,
+          }
+        }
+        const qty = toInt(item.quantity) || 1
+        const unitPriceCents = toInt(item.unitPriceCents)
+        const totalPriceCents = toInt(item.totalPriceCents) || qty * unitPriceCents
+        return {
+          materialName: String(item.materialName ?? item.productOrServiceName ?? ''),
+          quantity: qty,
+          unitPriceCents,
+          totalPriceCents,
+        }
+      })
+    : []
+
+  const cv = src.clientView && typeof src.clientView === 'object' ? src.clientView : {}
+  return {
+    ...base,
+    title: String(src.title ?? base.title),
+    quoteDescription: String(src.quoteDescription ?? base.quoteDescription),
+    salespersonName: String(src.salespersonName ?? base.salespersonName),
+    client: {
+      fullName: String(src.client?.fullName ?? base.client.fullName),
+      phone: String(src.client?.phone ?? base.client.phone),
+      email: String(src.client?.email ?? base.client.email),
+      address: String(src.client?.address ?? base.client.address),
+    },
+    lineItems,
+    clientView: {
+      subtotalCents: toInt(cv.subtotalCents),
+      discountCents: toInt(cv.discountCents),
+      taxCents: toInt(cv.taxCents),
+      totalCents: toInt(cv.totalCents),
+    },
+    attachments:
+      Array.isArray(src.attachments) && src.attachments.length > 0
+        ? src.attachments.map((a) => ({ url: String(a?.url ?? ''), name: String(a?.name ?? '') }))
+        : base.attachments,
+  }
+}
+
+function parseAssistantStructured(text) {
+  const extracted = extractEmbeddedJson(text)
+  if (!extracted) return { kind: 'text' }
+
+  const { value, raw, preamble = '', postamble = '' } = extracted
+
+  if (typeof value === 'object' && value !== null && !Array.isArray(value) && isQuoteLikePayload(value)) {
+    const quoteDraft = normalizeInboundQuoteDraft(value)
+    if (quoteDraft)
+      return {
+        kind: 'quote_preview',
+        rawString: raw,
+        value,
+        quoteDraft,
+        preamble,
+        postamble,
+      }
+  }
+
+  return {
+    kind: 'json',
+    rawString: raw,
+    value,
+    preamble,
+    postamble,
+  }
+}
+
+function AssistantMessageContent({
+  message,
+  quoteDraft,
+  setQuoteDraft,
+  recalcDraftFn,
+  setActionNotice,
+}) {
+  const [showRaw, setShowRaw] = useState(false)
+
+  if (message.role !== 'assistant') {
+    return <div className="whitespace-pre-wrap break-words">{message.text}</div>
+  }
+
+  const structured = parseAssistantStructured(message.text)
+
+  if (structured.kind === 'text') {
+    return <div className="whitespace-pre-wrap break-words">{message.text}</div>
+  }
+
+  const copyRaw = async () => {
+    try {
+      await navigator.clipboard.writeText(structured.rawString)
+      setActionNotice('Copied JSON to clipboard.')
+      setTimeout(() => setActionNotice(''), 2500)
+    } catch {
+      setActionNotice('Could not copy to clipboard.')
+      setTimeout(() => setActionNotice(''), 2500)
+    }
+  }
+
+  const applyQuote = () => {
+    if (structured.kind !== 'quote_preview') return
+    const normalized = normalizeInboundQuoteDraft(structured.value)
+    if (!normalized) return
+    setQuoteDraft(
+      recalcDraftFn({
+        ...normalized,
+        client: quoteDraft.client,
+        salespersonName: normalized.salespersonName?.trim()
+          ? normalized.salespersonName
+          : quoteDraft.salespersonName,
+      })
+    )
+    setActionNotice('Quote draft updated from this message.')
+    setTimeout(() => setActionNotice(''), 3000)
+  }
+
+  const jsonPretty =
+    structured.kind === 'json' ? JSON.stringify(structured.value, null, 2) : structured.rawString
+
+  const displayDraft = structured.kind === 'quote_preview' ? recalcDraftFn(structured.quoteDraft) : null
+
+  return (
+    <div className="space-y-2 break-words">
+      {structured.preamble ? (
+        <p className="whitespace-pre-wrap text-sm text-zinc-700">{structured.preamble}</p>
+      ) : null}
+
+      {structured.kind === 'quote_preview' && displayDraft ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50/60 p-3 text-zinc-900">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Quote preview</p>
+          {displayDraft.title ? (
+            <p className="mt-1 text-sm font-semibold text-zinc-900">{displayDraft.title}</p>
+          ) : null}
+          {displayDraft.quoteDescription ? (
+            <p className="mt-1 text-xs text-zinc-600">{displayDraft.quoteDescription}</p>
+          ) : null}
+          {(displayDraft.client?.fullName || displayDraft.client?.phone || displayDraft.client?.email) ? (
+            <div className="mt-2 rounded border border-emerald-100 bg-white/80 px-2 py-1.5 text-xs text-zinc-700">
+              {displayDraft.client.fullName ? <p className="font-medium">{displayDraft.client.fullName}</p> : null}
+              {displayDraft.client.phone ? <p>{displayDraft.client.phone}</p> : null}
+              {displayDraft.client.email ? <p>{displayDraft.client.email}</p> : null}
+            </div>
+          ) : null}
+          {displayDraft.lineItems.length > 0 ? (
+            <div className="mt-2 max-h-40 overflow-y-auto rounded border border-emerald-100 bg-white/90">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-200 bg-zinc-50 text-zinc-600">
+                    <th className="px-2 py-1">Item</th>
+                    <th className="px-2 py-1">Qty</th>
+                    <th className="px-2 py-1 text-right">Unit</th>
+                    <th className="px-2 py-1 text-right">Line</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayDraft.lineItems.map((item, idx) => (
+                    <tr key={idx} className="border-b border-zinc-100">
+                      <td className="px-2 py-1">
+                        {item.itemType === 'labor'
+                          ? `${item.trade ?? 'Labor'} (${item.expertiseLevel ?? 'standard'})`
+                          : item.materialName || '—'}
+                      </td>
+                      <td className="px-2 py-1">{item.itemType === 'labor' ? item.hours : item.quantity}</td>
+                      <td className="px-2 py-1 text-right">
+                        ${(toInt(item.itemType === 'labor' ? item.hourlyRateCents : item.unitPriceCents) / 100).toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1 text-right">
+                        ${(toInt(item.totalPriceCents) / 100).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-zinc-500">No line items in this payload.</p>
+          )}
+          <div className="mt-2 flex flex-wrap gap-2 border-t border-emerald-100 pt-2 text-xs">
+            <span className="text-zinc-600">
+              Subtotal ${(toInt(displayDraft.clientView.subtotalCents) / 100).toFixed(2)}
+            </span>
+            <span className="text-zinc-600">
+              Total ${(toInt(displayDraft.clientView.totalCents) / 100).toFixed(2)}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={applyQuote}>
+              Apply to draft
+            </Button>
+            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={copyRaw}>
+              <Copy className="mr-1 h-3 w-3" />
+              Copy JSON
+            </Button>
+            <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowRaw((s) => !s)}>
+              {showRaw ? 'Hide raw' : 'Show raw'}
+            </Button>
+          </div>
+          {showRaw ? (
+            <pre className="mt-2 max-h-36 overflow-auto rounded border border-zinc-200 bg-zinc-950 p-2 text-[11px] text-zinc-100">
+              {structured.rawString}
+            </pre>
+          ) : null}
+        </div>
+      ) : (
+        <div className="rounded-md border border-violet-200 bg-violet-50/60 p-3 text-zinc-900">
+          <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">Structured data</p>
+          <pre className="mt-2 max-h-48 overflow-auto rounded border border-violet-100 bg-white/90 p-2 text-[11px] leading-relaxed text-zinc-800">
+            {jsonPretty}
+          </pre>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={copyRaw}>
+              <Copy className="mr-1 h-3 w-3" />
+              Copy JSON
+            </Button>
+            <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowRaw((s) => !s)}>
+              {showRaw ? 'Hide raw' : 'Show raw'}
+            </Button>
+          </div>
+          {showRaw && structured.kind === 'json' ? (
+            <pre className="mt-2 max-h-36 overflow-auto rounded border border-zinc-200 bg-zinc-950 p-2 text-[11px] text-zinc-100">
+              {message.text}
+            </pre>
+          ) : null}
+        </div>
+      )}
+
+      {structured.postamble ? (
+        <p className="whitespace-pre-wrap text-sm text-zinc-700">{structured.postamble}</p>
+      ) : null}
+    </div>
+  )
+}
+
+function applyHandoffClientToDraft(draft, handoffClient) {
+  if (!handoffClient || typeof handoffClient !== 'object') return draft
+  const fullName = String(handoffClient.fullName ?? '').trim()
+  const phone = String(handoffClient.phone ?? '').trim()
+  const email = String(handoffClient.email ?? '').trim()
+  const address = String(handoffClient.address ?? '').trim()
+  return {
+    ...draft,
+    client: {
+      ...draft.client,
+      fullName: fullName || draft.client.fullName,
+      phone: phone || draft.client.phone,
+      email: email || draft.client.email,
+      address: address || draft.client.address,
+    },
+  }
+}
+
 function AiAssistantPage() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -138,8 +493,11 @@ function AiAssistantPage() {
   const chatViewportRef = useRef(null)
   const chatBottomRef = useRef(null)
   const clientPickerRef = useRef(null)
+  const promptInputRef = useRef(null)
   const didLoadThreadRef = useRef(false)
-  const didHandleContactHandoffRef = useRef(false)
+  /** Last successful Create Quote handoff (React Router location.key) so we do not double-run or block retries. */
+  const processedCreateQuoteHandoffKeyRef = useRef(null)
+  const processedJobberSeedHandoffKeyRef = useRef(null)
   const didHandleQuoteResumeRef = useRef(false)
 
   function scrollToLatest(behavior = 'smooth') {
@@ -147,6 +505,18 @@ function AiAssistantPage() {
   }
 
   useEffect(() => {
+    const hasResumeQuote = Boolean(location.state?.resumeQuoteId)
+    const hasContactHandoff = Boolean(location.state?.contactId && location.state?.startNewChat)
+    const hasJobberSeedOnly = Boolean(
+      location.state?.startNewChat && location.state?.jobberRequestSeed && !location.state?.contactId
+    )
+    if (hasResumeQuote || hasContactHandoff || hasJobberSeedOnly) {
+      // Resume/handoff flows manage their own thread hydration and would be
+      // overwritten by a concurrent default thread load.
+      setIsLoadingThread(false)
+      return
+    }
+
     let isCancelled = false
 
     async function loadThread() {
@@ -173,7 +543,7 @@ function AiAssistantPage() {
     return () => {
       isCancelled = true
     }
-  }, [])
+  }, [location.state])
 
   useEffect(() => {
     const resumeQuoteId = location.state?.resumeQuoteId
@@ -182,6 +552,7 @@ function AiAssistantPage() {
     let cancelled = false
     async function runQuoteResume() {
       try {
+        setIsLoadingThread(true)
         setChatError('')
         setActionNotice('')
         const response = await apiRequest(`/api/sales/quotes/${encodeURIComponent(resumeQuoteId)}/continue`, {
@@ -192,12 +563,15 @@ function AiAssistantPage() {
         if (response?.quoteDraft) setQuoteDraft(recalcDraft(response.quoteDraft))
         setSelectedClientId(response?.selectedClientId ?? '')
         setDraftUpdated(false)
+        didLoadThreadRef.current = true
         setActionNotice('Draft quote loaded into AI Assistant. Continue editing below.')
         navigate(location.pathname, { replace: true, state: null })
         requestAnimationFrame(() => scrollToLatest('auto'))
       } catch (error) {
         if (cancelled) return
         setChatError(error?.message || 'Failed to load selected draft quote')
+      } finally {
+        if (!cancelled) setIsLoadingThread(false)
       }
     }
     void runQuoteResume()
@@ -208,41 +582,157 @@ function AiAssistantPage() {
 
   useEffect(() => {
     const handoffContactId = location.state?.contactId
+    const handoffClient = location.state?.handoffClient
     const shouldStartNewChat = Boolean(location.state?.startNewChat)
-    if (!handoffContactId || !shouldStartNewChat || didHandleContactHandoffRef.current) return
-    didHandleContactHandoffRef.current = true
+    if (!handoffContactId || !shouldStartNewChat) return
+
+    const navKey = location.key
+    if (processedCreateQuoteHandoffKeyRef.current === navKey) return
+
     let cancelled = false
+
     async function runContactHandoff() {
       try {
+        setIsLoadingThread(true)
         setChatError('')
         setActionNotice('')
         setIsCreatingNewChat(true)
+
+        // Immediate draft preview: client block fills before network completes.
+        setQuoteDraft((current) => applyHandoffClientToDraft(current, handoffClient))
+        setSelectedClientId(handoffContactId)
+
+        const threadSnapshot = await apiRequest('/api/sales/ai-assistant/thread')
+        if (cancelled) return
+
+        const priorMessages = normalizeMessages(threadSnapshot?.messages)
+        const priorClientId = String(threadSnapshot?.selectedClientId ?? '').trim()
+        const hasUserTurn = priorMessages.some((m) => m.role === 'user')
+
+        if (hasUserTurn && priorClientId) {
+          try {
+            await apiRequest('/api/sales/ai-assistant/draft/save', { method: 'POST' })
+          } catch (saveErr) {
+            if (cancelled) return
+            setChatError(
+              saveErr?.message ||
+                'Could not save the previous quote draft. Fix the issue or save manually, then try Create Quote again.'
+            )
+            navigate(location.pathname, { replace: true, state: null })
+            return
+          }
+        }
+
         const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
         if (cancelled) return
         setMessages(normalizeMessages(resetResponse?.messages))
-        if (resetResponse?.quoteDraft) setQuoteDraft(recalcDraft(resetResponse.quoteDraft))
+        if (resetResponse?.quoteDraft) {
+          setQuoteDraft(recalcDraft(applyHandoffClientToDraft(recalcDraft(resetResponse.quoteDraft), handoffClient)))
+        }
+
         const clientResponse = await apiRequest('/api/sales/ai-assistant/thread/client', {
           method: 'PATCH',
           body: JSON.stringify({ selectedClientId: handoffContactId }),
         })
         if (cancelled) return
-        if (clientResponse?.quoteDraft) setQuoteDraft(recalcDraft(clientResponse.quoteDraft))
-        if (Array.isArray(clientResponse?.messages)) setMessages(normalizeMessages(clientResponse.messages))
+
+        if (clientResponse?.quoteDraft) {
+          setQuoteDraft(recalcDraft(applyHandoffClientToDraft(recalcDraft(clientResponse.quoteDraft), handoffClient)))
+        }
+        if (Array.isArray(clientResponse?.messages)) {
+          setMessages(normalizeMessages(clientResponse.messages))
+        }
         setSelectedClientId(clientResponse?.selectedClientId ?? handoffContactId)
-        setActionNotice('New chat started with selected contact from Contacts.')
+        setDraftUpdated(false)
+        didLoadThreadRef.current = true
+        processedCreateQuoteHandoffKeyRef.current = navKey
+
+        const seed = location.state?.jobberRequestSeed
+        if (seed && typeof seed === 'object') {
+          const t = String(seed.title ?? '').trim()
+          const d = String(seed.quoteDescription ?? '').trim()
+          setQuoteDraft((current) =>
+            recalcDraft({
+              ...current,
+              title: t || current.title,
+              quoteDescription: d || current.quoteDescription,
+            })
+          )
+        }
+
+        const savedNote = hasUserTurn && priorClientId ? 'Previous draft saved. ' : ''
+        setActionNotice(
+          `${savedNote}New chat started — client details are loaded in the quote draft for this contact.`
+        )
         navigate(location.pathname, { replace: true, state: null })
+        requestAnimationFrame(() => scrollToLatest('auto'))
       } catch (error) {
         if (cancelled) return
         setChatError(error?.message || 'Failed to start new chat from selected contact')
+        navigate(location.pathname, { replace: true, state: null })
       } finally {
-        if (!cancelled) setIsCreatingNewChat(false)
+        if (!cancelled) {
+          setIsCreatingNewChat(false)
+          setIsLoadingThread(false)
+        }
       }
     }
+
     void runContactHandoff()
     return () => {
       cancelled = true
     }
-  }, [location.state, location.pathname, navigate])
+  }, [location.key, location.state, location.pathname, navigate])
+
+  useEffect(() => {
+    const seed = location.state?.jobberRequestSeed
+    const shouldStart = Boolean(location.state?.startNewChat)
+    const contactId = location.state?.contactId
+    if (!shouldStart || !seed || contactId) return
+
+    const navKey = location.key
+    if (processedJobberSeedHandoffKeyRef.current === navKey) return
+
+    let cancelled = false
+
+    async function runJobberSeedHandoff() {
+      try {
+        setIsLoadingThread(true)
+        setChatError('')
+        setActionNotice('')
+        setIsCreatingNewChat(true)
+
+        const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
+        if (cancelled) return
+        setMessages(normalizeMessages(resetResponse?.messages))
+        const base = resetResponse?.quoteDraft ? recalcDraft(resetResponse.quoteDraft) : createDefaultQuoteDraft()
+        const t = String(seed.title ?? '').trim()
+        const d = String(seed.quoteDescription ?? '').trim()
+        setQuoteDraft(recalcDraft({ ...base, title: t || base.title, quoteDescription: d || base.quoteDescription }))
+        setSelectedClientId('')
+        setDraftUpdated(false)
+        didLoadThreadRef.current = true
+        processedJobberSeedHandoffKeyRef.current = navKey
+        setActionNotice('Select a client, then use AI to build a quote from this Jobber request.')
+        navigate(location.pathname, { replace: true, state: null })
+        requestAnimationFrame(() => scrollToLatest('auto'))
+      } catch (error) {
+        if (cancelled) return
+        setChatError(error?.message || 'Failed to start from Jobber request')
+        navigate(location.pathname, { replace: true, state: null })
+      } finally {
+        if (!cancelled) {
+          setIsCreatingNewChat(false)
+          setIsLoadingThread(false)
+        }
+      }
+    }
+
+    void runJobberSeedHandoff()
+    return () => {
+      cancelled = true
+    }
+  }, [location.key, location.state, location.pathname, navigate])
 
   useEffect(() => {
     let isCancelled = false
@@ -422,6 +912,13 @@ function AiAssistantPage() {
     setShowJumpToLatest(true)
   }, [messages, isNearBottom])
 
+  useEffect(() => {
+    const textarea = promptInputRef.current
+    if (!textarea) return
+    textarea.style.height = '0px'
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 140)}px`
+  }, [prompt])
+
   function handleChatScroll() {
     const el = chatViewportRef.current
     if (!el) return
@@ -452,7 +949,7 @@ function AiAssistantPage() {
         lineItems: [
           ...current.lineItems,
           {
-            productOrServiceName: '',
+            materialName: '',
             quantity: 1,
             unitPriceCents: 0,
             totalPriceCents: 0,
@@ -475,7 +972,7 @@ function AiAssistantPage() {
             expertiseLevel: fallback?.expertiseLevel ?? 'standard',
             hours: 1,
             hourlyRateCents: toInt(fallback?.hourlyRateCents),
-            productOrServiceName: buildLaborLabel(
+            materialName: buildLaborLabel(
               fallback?.trade ?? 'general_handyman',
               fallback?.expertiseLevel ?? 'standard'
             ),
@@ -526,7 +1023,7 @@ function AiAssistantPage() {
         lineItems: [
           ...current.lineItems,
           {
-            productOrServiceName: selected.name,
+            materialName: selected.name,
             quantity: 1,
             unitPriceCents: toInt(selected.unitPriceCents),
             totalPriceCents: toInt(selected.unitPriceCents),
@@ -592,27 +1089,53 @@ function AiAssistantPage() {
   }
 
   async function handleSelectClient(clientId) {
-    setSelectedClientId(clientId)
     if (!clientId) return
     setChatError('')
+    setActionNotice('')
     setIsSavingClient(true)
     try {
-      const response = await apiRequest('/api/sales/ai-assistant/thread/client', {
+      const isSwitchingClients = Boolean(selectedClientId) && selectedClientId !== clientId
+      // Always hydrate the quote draft with the selected client first.
+      const firstAttachResponse = await apiRequest('/api/sales/ai-assistant/thread/client', {
         method: 'PATCH',
         body: JSON.stringify({ selectedClientId: clientId }),
       })
-      if (response?.quoteDraft) {
-        setQuoteDraft(recalcDraft(response.quoteDraft))
+      if (firstAttachResponse?.quoteDraft) {
+        setQuoteDraft(recalcDraft(firstAttachResponse.quoteDraft))
       }
-      if (Array.isArray(response?.messages)) {
-        setMessages(normalizeMessages(response.messages))
+      if (Array.isArray(firstAttachResponse?.messages)) {
+        setMessages(normalizeMessages(firstAttachResponse.messages))
       }
-      setSelectedClientId(response?.selectedClientId ?? clientId)
+
+      if (isSwitchingClients) {
+        setIsCreatingNewChat(true)
+        // Archive previous conversation and reset, then attach selected client to blank draft.
+        await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
+        const attachAfterReset = await apiRequest('/api/sales/ai-assistant/thread/client', {
+          method: 'PATCH',
+          body: JSON.stringify({ selectedClientId: clientId }),
+        })
+        if (attachAfterReset?.quoteDraft) {
+          setQuoteDraft(recalcDraft(attachAfterReset.quoteDraft))
+        }
+        if (Array.isArray(attachAfterReset?.messages)) {
+          setMessages(normalizeMessages(attachAfterReset.messages))
+        }
+        setSelectedClientId(attachAfterReset?.selectedClientId ?? clientId)
+        setDraftUpdated(false)
+      } else {
+        setSelectedClientId(firstAttachResponse?.selectedClientId ?? clientId)
+      }
+
       setIsClientPickerOpen(false)
+      if (isSwitchingClients) {
+        setActionNotice('Previous chat was saved and a new chat started for the selected client.')
+      }
     } catch (error) {
       setChatError(error?.message || 'Failed to set selected client')
     } finally {
       setIsSavingClient(false)
+      setIsCreatingNewChat(false)
     }
   }
 
@@ -704,6 +1227,13 @@ function AiAssistantPage() {
     }
   }
 
+  async function handleCancelQuote() {
+    if (isCreatingNewChat || isSavingDraft || isApprovingQuote) return
+    const confirmed = window.confirm('Cancel this quote draft? Unsaved changes will be lost.')
+    if (!confirmed) return
+    await handleNewChat()
+  }
+
   async function handleOpenHistorySession(historyId) {
     try {
       setActionNotice('')
@@ -733,31 +1263,33 @@ function AiAssistantPage() {
               AI suggestions appear here. You can edit before saving or sending.
             </CardDescription>
           </CardHeader>
-          <CardContent className="min-h-0 flex-1 overflow-y-auto">
-            <div className="space-y-4 pr-1">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <CardContent className="min-h-0 flex flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_130px]">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-zinc-600">Quote Title</label>
                   <Input value={quoteDraft.title} onChange={(event) => updateQuoteField('title', event.target.value)} />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-zinc-600">Salesperson Name</label>
-                  <Input
-                    value={quoteDraft.salespersonName}
-                    onChange={(event) => updateQuoteField('salespersonName', event.target.value)}
-                  />
+                <div className="mt-6 flex h-8 items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-1.5">
+                  <UserCircle2 className="h-3 w-3 shrink-0 text-zinc-500" />
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500">Rep</p>
+                    <p className="truncate text-[10px] text-zinc-700">
+                      {quoteDraft.salespersonName || 'Assigned sales rep'}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-zinc-600">Quote Description</label>
                 <textarea
-                  className="min-h-20 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400"
+                  className="min-h-20 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400"
                   value={quoteDraft.quoteDescription ?? ''}
                   onChange={(event) => updateQuoteField('quoteDescription', event.target.value)}
                 />
               </div>
 
-              <div className="rounded-lg border border-zinc-200 p-3">
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-600">Client Selection</p>
                 <div className="space-y-1" ref={clientPickerRef}>
                   <label className="text-xs font-semibold text-zinc-600">Search Client</label>
@@ -808,9 +1340,9 @@ function AiAssistantPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-zinc-200 p-3">
+              <div className="rounded-lg border border-zinc-200 bg-zinc-100/55 p-3">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-600">Line Items</p>
-                <div className="mb-3 rounded-md border border-zinc-200 p-3">
+                <div className="mb-3 rounded-md border border-zinc-200 bg-white p-3">
                   <p className="mb-2 text-xs font-semibold text-zinc-600">Add from Materials Catalog</p>
                   <div className="space-y-2">
                     <Input
@@ -848,15 +1380,13 @@ function AiAssistantPage() {
                       <Button
                         type="button"
                         variant="outline"
+                        className="bg-zinc-100 hover:bg-zinc-200"
                         onClick={addCatalogLineItem}
                         disabled={isLoadingCatalogItems || !selectedCatalogItem}>
                         Add Selected Material
                       </Button>
-                      <Button type="button" variant="outline" onClick={addCustomLineItem}>
+                      <Button type="button" variant="outline" className="bg-zinc-100 hover:bg-zinc-200" onClick={addCustomLineItem}>
                         Add Custom
-                      </Button>
-                      <Button type="button" variant="outline" onClick={addLaborLineItem}>
-                        Add Labor
                       </Button>
                     </div>
                     {selectedCatalogItem ? (
@@ -870,13 +1400,13 @@ function AiAssistantPage() {
                   {quoteDraft.lineItems.map((item, index) => {
                     if (item.itemType === 'labor') return null
                     return (
-                    <div key={`${item.productOrServiceName}-${index}`} className="rounded-md border border-zinc-200 p-3">
+                    <div key={`${item.materialName ?? 'line'}-${index}`} className="rounded-md border border-zinc-200 bg-white p-3">
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <label className="text-xs font-semibold text-zinc-600">Product / Service</label>
+                          <label className="text-xs font-semibold text-zinc-600">Material</label>
                           <Input
-                            value={item.productOrServiceName}
-                            onChange={(event) => updateLineItem(index, 'productOrServiceName', event.target.value)}
+                            value={item.materialName ?? ''}
+                            onChange={(event) => updateLineItem(index, 'materialName', event.target.value)}
                           />
                         </div>
                         <div className="space-y-1">
@@ -904,7 +1434,7 @@ function AiAssistantPage() {
                           <Input value={`$${(toInt(item.totalPriceCents) / 100).toFixed(2)}`} disabled />
                         </div>
                         <div className="sm:col-span-2">
-                          <Button type="button" variant="outline" onClick={() => removeLineItem(index)}>
+                          <Button type="button" variant="outline" className="bg-zinc-100 hover:bg-zinc-200" onClick={() => removeLineItem(index)}>
                             Remove Item
                           </Button>
                         </div>
@@ -915,10 +1445,10 @@ function AiAssistantPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-zinc-200 p-3">
+              <div className="rounded-lg border border-zinc-200 bg-zinc-100/70 p-3">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600">Labor</p>
-                  <Button type="button" variant="outline" size="sm" onClick={addLaborLineItem}>
+                  <Button type="button" variant="outline" size="sm" className="bg-zinc-100 hover:bg-zinc-200" onClick={addLaborLineItem}>
                     Add Labor
                   </Button>
                 </div>
@@ -926,7 +1456,7 @@ function AiAssistantPage() {
                   {quoteDraft.lineItems.map((item, index) => {
                     if (item.itemType !== 'labor') return null
                     return (
-                      <div key={`labor-${index}`} className="rounded-md border border-zinc-200 p-3">
+                      <div key={`labor-${index}`} className="rounded-md border border-zinc-200 bg-white p-3">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div className="space-y-1">
                             <label className="text-xs font-semibold text-zinc-600">Trade</label>
@@ -1015,7 +1545,7 @@ function AiAssistantPage() {
                             <Input value={`$${(toInt(item.totalPriceCents) / 100).toFixed(2)}`} disabled />
                           </div>
                           <div className="sm:col-span-2">
-                            <Button type="button" variant="outline" onClick={() => removeLineItem(index)}>
+                            <Button type="button" variant="outline" className="bg-zinc-100 hover:bg-zinc-200" onClick={() => removeLineItem(index)}>
                               Remove Labor
                             </Button>
                           </div>
@@ -1034,7 +1564,7 @@ function AiAssistantPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-zinc-200 p-3">
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50/90 p-3">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-600">Totals</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
@@ -1066,7 +1596,7 @@ function AiAssistantPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-zinc-200 p-3">
+              <div className="rounded-lg border border-zinc-200 bg-zinc-100/45 p-3">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-600">Attachment</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
@@ -1085,21 +1615,33 @@ function AiAssistantPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-2 pt-1">
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-zinc-200 bg-white pt-3">
+              <div className="flex items-center gap-2">
                 <Button
                   type="button"
                   variant="outline"
+                  className="bg-zinc-100 hover:bg-zinc-200"
+                  onClick={handleCancelQuote}
+                  disabled={isCreatingNewChat || isSavingDraft || isApprovingQuote}>
+                  Cancel Quote
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="bg-zinc-100 hover:bg-zinc-200"
                   onClick={handleSaveDraft}
                   disabled={!selectedClientId || isSavingDraft || isApprovingQuote}>
                   {isSavingDraft ? 'Saving...' : 'Save Draft'}
                 </Button>
-                <Button
-                  type="button"
-                  onClick={handleApproveQuote}
-                  disabled={!selectedClientId || isApprovingQuote || isSavingDraft}>
-                  {isApprovingQuote ? 'Approving...' : 'Approve Quote'}
-                </Button>
               </div>
+              <Button
+                type="button"
+                className="bg-zinc-900 text-white hover:bg-zinc-800"
+                onClick={handleApproveQuote}
+                disabled={!selectedClientId || isApprovingQuote || isSavingDraft}>
+                {isApprovingQuote ? 'Approving...' : 'Approve Quote'}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -1143,7 +1685,13 @@ function AiAssistantPage() {
                         ? 'ml-auto bg-zinc-900 text-white'
                         : 'bg-white text-zinc-800 border border-zinc-200'
                     }`}>
-                    {message.text}
+                    <AssistantMessageContent
+                      message={message}
+                      quoteDraft={quoteDraft}
+                      setQuoteDraft={setQuoteDraft}
+                      recalcDraftFn={recalcDraft}
+                      setActionNotice={setActionNotice}
+                    />
                   </div>
                 ))}
                 {isLoadingThread ? <p className="text-xs text-zinc-500">Loading conversation...</p> : null}
@@ -1163,14 +1711,19 @@ function AiAssistantPage() {
                 New messages
               </Button>
             ) : null}
-            <div className="flex shrink-0 gap-2">
-              <Input
+            <div className="flex shrink-0 items-end gap-2">
+              <textarea
+                ref={promptInputRef}
                 placeholder="Ask AI assistant..."
                 value={prompt}
                 disabled={isSending || !selectedClientId}
+                className="max-h-[140px] min-h-[40px] w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-50"
                 onChange={(event) => setPrompt(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter') handleSend()
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    handleSend()
+                  }
                 }}
               />
               <Button type="button" onClick={handleSend} disabled={isSending || !prompt.trim() || !selectedClientId}>

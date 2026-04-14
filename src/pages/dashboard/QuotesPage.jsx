@@ -186,6 +186,11 @@ function QuotesPage() {
     <>
     <Card className="border-zinc-200 bg-white">
       <CardContent className="space-y-3">
+        <div className="flex justify-end">
+          <Button type="button" onClick={() => navigate('/dashboard/ai-assistant', { state: { startNewChat: true } })}>
+            Create Quote
+          </Button>
+        </div>
         <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
           <Input
             value={search}
@@ -374,14 +379,18 @@ function QuotesPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-200 bg-white">
-                        {selectedQuote.lineItems.map((item, idx) => (
-                          <tr key={`${item.productOrServiceName}-${idx}`}>
-                            <td className="px-3 py-2 text-sm text-zinc-800">{item.productOrServiceName || '-'}</td>
+                        {selectedQuote.lineItems.map((item, idx) => {
+                          const lineLabel =
+                            item.materialName || item.productOrServiceName || item.description || '-'
+                          return (
+                          <tr key={`${lineLabel}-${idx}`}>
+                            <td className="px-3 py-2 text-sm text-zinc-800">{lineLabel}</td>
                             <td className="px-3 py-2 text-sm text-zinc-800">{item.quantity}</td>
                             <td className="px-3 py-2 text-sm text-zinc-800">{formatMoneyFromCents(item.unitPriceCents)}</td>
                             <td className="px-3 py-2 text-sm text-zinc-800">{formatMoneyFromCents(item.totalPriceCents)}</td>
                           </tr>
-                        ))}
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>

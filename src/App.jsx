@@ -4,7 +4,7 @@ import DashboardPage from '@/pages/DashboardPage'
 import AiAssistantPage from '@/pages/dashboard/AiAssistantPage'
 import ContactsPage from '@/pages/dashboard/ContactsPage'
 import OverviewPage from '@/pages/dashboard/OverviewPage'
-import OpportunityPage from '@/pages/dashboard/OpportunityPage'
+import RequestsPage from '@/pages/dashboard/RequestsPage'
 import QuotesPage from '@/pages/dashboard/QuotesPage'
 import SettingsPage from '@/pages/dashboard/SettingsPage'
 import SignInPage from '@/pages/SignInPage'
@@ -22,7 +22,8 @@ function App() {
         }>
         <Route index element={<Navigate to="overview" replace />} />
         <Route path="overview" element={<OverviewPage />} />
-        <Route path="opportunity" element={<OpportunityPage />} />
+        <Route path="requests" element={<RequestsPage />} />
+        <Route path="opportunity" element={<Navigate to="/dashboard/requests" replace />} />
         <Route path="ai-assistant" element={<AiAssistantPage />} />
         <Route path="contacts" element={<ContactsPage />} />
         <Route path="quotes" element={<QuotesPage />} />

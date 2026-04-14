@@ -16,6 +16,7 @@ function OverviewPage() {
     approvedTotal: 0,
     quoteValueTodayCents: 0,
     approvedValueTodayCents: 0,
+    requestsOpen: 0,
     opportunitiesOpen: 0,
     contactsTotal: 0,
   })
@@ -31,7 +32,14 @@ function OverviewPage() {
         if (!cancelled) {
           setOverviewMessage(overview.message)
           setAlerts(Array.isArray(notifications?.items) ? notifications.items : [])
-          if (overview?.metrics) setMetrics(overview.metrics)
+          if (overview?.metrics) {
+            const m = overview.metrics
+            setMetrics({
+              ...m,
+              requestsOpen: m.requestsOpen ?? m.opportunitiesOpen ?? 0,
+              opportunitiesOpen: m.opportunitiesOpen ?? m.requestsOpen ?? 0,
+            })
+          }
         }
       } catch {
         if (!cancelled) setOverviewMessage('Overview data is currently unavailable.')
@@ -104,8 +112,8 @@ function OverviewPage() {
               <p className="text-2xl font-bold text-zinc-900">{metrics.approvedTotal}</p>
             </div>
             <div className="rounded-lg border border-zinc-200 p-3">
-              <p className="text-xs text-zinc-500">Open Opportunities</p>
-              <p className="text-2xl font-bold text-zinc-900">{metrics.opportunitiesOpen}</p>
+              <p className="text-xs text-zinc-500">Open Jobber Requests</p>
+              <p className="text-2xl font-bold text-zinc-900">{metrics.requestsOpen ?? metrics.opportunitiesOpen}</p>
             </div>
             <div className="rounded-lg border border-zinc-200 p-3">
               <p className="text-xs text-zinc-500">Active Contacts</p>
