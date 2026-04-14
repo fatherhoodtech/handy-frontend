@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { getMe, login as loginApi, logout as logoutApi, refreshSession } from '@/auth/authApi'
+import { applyTokenResponse, clearSalesTokens } from '@/auth/authTokenStorage'
 
 const AuthContext = createContext(null)
 
@@ -17,8 +18,10 @@ export function AuthProvider({ children }) {
       } catch (error) {
         try {
           const refreshed = await refreshSession()
+          applyTokenResponse(refreshed)
           if (!cancelled) setUser(refreshed.user)
         } catch {
+          clearSalesTokens()
           if (!cancelled) setUser(null)
         }
       } finally {
@@ -34,6 +37,7 @@ export function AuthProvider({ children }) {
 
   async function login(email, password) {
     const response = await loginApi({ email, password })
+    applyTokenResponse(response)
     setUser(response.user)
     return response.user
   }
@@ -42,6 +46,7 @@ export function AuthProvider({ children }) {
     try {
       await logoutApi()
     } finally {
+      clearSalesTokens()
       setUser(null)
     }
   }
