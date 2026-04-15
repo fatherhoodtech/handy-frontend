@@ -33,9 +33,9 @@ function DashboardPage() {
 
   const navItems = [
     { to: '/dashboard/overview', label: 'Overview', icon: LayoutDashboard },
+    { to: '/dashboard/contacts', label: 'Contacts', icon: Mail },
     { to: '/dashboard/requests', label: 'Requests', icon: ListFilter },
     { to: '/dashboard/ai-assistant', label: 'AI Assistant', icon: Bot },
-    { to: '/dashboard/contacts', label: 'Contacts', icon: Mail },
     { to: '/dashboard/quotes', label: 'Quotes', icon: ClipboardList },
     { to: '/dashboard/settings', label: 'Settings', icon: Settings },
   ]
