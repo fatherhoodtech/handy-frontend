@@ -1,0 +1,37 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build -- --mode production
+        env:
+          VITE_API_BASE_URL: https://handy.us.eqv.rw
+
+      - name: Upload dist to droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: handy.us.eqv.rw
+          username: root
+          key: ${{ secrets.DO_SSH_KEY }}
+          source: dist/
+          target: /root/handy-frontend/
+          strip_components: 0
