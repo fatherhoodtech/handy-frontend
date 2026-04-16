@@ -1,14 +1,32 @@
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { apiRequest } from '@/lib/apiClient'
+import { CheckCircle, DollarSign, FileText, ListFilter, RefreshCw } from 'lucide-react'
 
 function formatMoney(cents) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100)
 }
 
+function StatCard({ label, value, sub, icon: Icon, iconClass }) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
+          <p className="mt-2 text-3xl font-bold text-zinc-900">{value}</p>
+          <p className="mt-0.5 text-xs text-zinc-400">{sub}</p>
+        </div>
+        <span className={`rounded-lg p-2 ${iconClass}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function OverviewPage() {
-  const [overviewMessage, setOverviewMessage] = useState('')
+  const [, setOverviewMessage] = useState('')
   const [alerts, setAlerts] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [metrics, setMetrics] = useState({
     quotesCreatedToday: 0,
     quotesApprovedToday: 0,
@@ -43,111 +61,130 @@ function OverviewPage() {
         }
       } catch {
         if (!cancelled) setOverviewMessage('Overview data is currently unavailable.')
+      } finally {
+        if (!cancelled) setIsLoading(false)
       }
     }
     void loadOverview()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
   return (
     <div className="space-y-6">
-      <p className="text-zinc-600">
-        {overviewMessage || 'Welcome back. Here is your sales snapshot for today.'}
-      </p>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-zinc-200 bg-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-zinc-600">Quotes Created Today</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-zinc-900">{metrics.quotesCreatedToday}</p>
-            <p className="text-xs text-zinc-500">All newly created selected quotes today</p>
-          </CardContent>
-        </Card>
-        <Card className="border-zinc-200 bg-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-zinc-600">Quotes Approved Today</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-zinc-900">{metrics.quotesApprovedToday}</p>
-            <p className="text-xs text-zinc-500">Approved and ready for follow-up</p>
-          </CardContent>
-        </Card>
-        <Card className="border-zinc-200 bg-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-zinc-600">Quote Value Today</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-zinc-900">{formatMoney(metrics.quoteValueTodayCents)}</p>
-            <p className="text-xs text-zinc-500">Total created quote value today</p>
-          </CardContent>
-        </Card>
-        <Card className="border-zinc-200 bg-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-zinc-600">Approved Value Today</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-zinc-900">{formatMoney(metrics.approvedValueTodayCents)}</p>
-            <p className="text-xs text-zinc-500">Approved quote value today</p>
-          </CardContent>
-        </Card>
+      {/* Key metrics */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="New Requests"
+          value={isLoading ? '—' : metrics.requestsOpen}
+          sub="Open Jobber requests"
+          icon={ListFilter}
+          iconClass="bg-sky-50 text-sky-600"
+        />
+        <StatCard
+          label="Open Drafts"
+          value={isLoading ? '—' : metrics.draftsOpen}
+          sub="Quotes awaiting approval"
+          icon={FileText}
+          iconClass="bg-amber-50 text-amber-600"
+        />
+        <StatCard
+          label="Sent to Jobber"
+          value={isLoading ? '—' : metrics.approvedTotal}
+          sub="Last 7 days"
+          icon={RefreshCw}
+          iconClass="bg-emerald-50 text-emerald-600"
+        />
+        <StatCard
+          label="Revenue (30 days)"
+          value={isLoading ? '—' : formatMoney(metrics.approvedValueTodayCents)}
+          sub="30-day tracking coming soon"
+          icon={DollarSign}
+          iconClass="bg-violet-50 text-violet-600"
+        />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-        <Card className="border-zinc-200 bg-white">
-          <CardHeader>
-            <CardTitle>System Status</CardTitle>
-            <CardDescription>Current state of sales operations.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-zinc-200 p-3">
-              <p className="text-xs text-zinc-500">Draft Quotes Open</p>
-              <p className="text-2xl font-bold text-zinc-900">{metrics.draftsOpen}</p>
-            </div>
-            <div className="rounded-lg border border-zinc-200 p-3">
-              <p className="text-xs text-zinc-500">Approved Quotes Total</p>
-              <p className="text-2xl font-bold text-zinc-900">{metrics.approvedTotal}</p>
-            </div>
-            <div className="rounded-lg border border-zinc-200 p-3">
-              <p className="text-xs text-zinc-500">Open Jobber Requests</p>
-              <p className="text-2xl font-bold text-zinc-900">{metrics.requestsOpen ?? metrics.opportunitiesOpen}</p>
-            </div>
-            <div className="rounded-lg border border-zinc-200 p-3">
-              <p className="text-xs text-zinc-500">Active Contacts</p>
-              <p className="text-2xl font-bold text-zinc-900">{metrics.contactsTotal}</p>
-            </div>
-            <div className="rounded-lg border border-zinc-200 p-3 sm:col-span-2">
-              <p className="text-xs text-zinc-500">Conversion Signal (today)</p>
-              <p className="text-2xl font-bold text-zinc-900">
-                {metrics.quotesCreatedToday > 0
-                  ? `${Math.round((metrics.quotesApprovedToday / metrics.quotesCreatedToday) * 100)}%`
-                  : '0%'}
-              </p>
-              <p className="text-xs text-zinc-500">Approved today / created today</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Bottom section */}
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
 
-        <Card className="border-zinc-200 bg-white">
-          <CardHeader>
-            <CardTitle>Alerts</CardTitle>
-            <CardDescription>Recent workflow notifications.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {alerts.length === 0 ? (
-              <p className="text-sm text-zinc-500">No recent alerts.</p>
-            ) : alerts.map((item) => (
-              <div key={item.id} className="rounded-lg border border-zinc-200 p-3">
-                <p className="font-medium text-zinc-900">{item.title}</p>
-                <p className="text-sm text-zinc-600">{item.body}</p>
-                <p className="mt-1 text-xs text-zinc-500">{new Date(item.createdAt).toLocaleString()}</p>
+        {/* System status */}
+        <div className="rounded-xl border border-zinc-200 bg-white">
+          <div className="border-b border-zinc-200 px-5 py-4">
+            <h2 className="font-semibold text-zinc-900">System Status</h2>
+            <p className="mt-0.5 text-xs text-zinc-500">Current state of sales operations</p>
+          </div>
+          <div className="grid gap-3 p-5 sm:grid-cols-2">
+            <div className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+              <span className="rounded-lg bg-emerald-50 p-2 text-emerald-600"><CheckCircle className="h-4 w-4" /></span>
+              <div>
+                <p className="text-xs text-zinc-500">Approved Quotes Total</p>
+                <p className="text-2xl font-bold text-zinc-900">{isLoading ? '—' : metrics.approvedTotal}</p>
               </div>
-            ))}
-          </CardContent>
-        </Card>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+              <span className="rounded-lg bg-amber-50 p-2 text-amber-600"><FileText className="h-4 w-4" /></span>
+              <div>
+                <p className="text-xs text-zinc-500">Draft Quotes Open</p>
+                <p className="text-2xl font-bold text-zinc-900">{isLoading ? '—' : metrics.draftsOpen}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+              <span className="rounded-lg bg-sky-50 p-2 text-sky-600"><ListFilter className="h-4 w-4" /></span>
+              <div>
+                <p className="text-xs text-zinc-500">Open Requests</p>
+                <p className="text-2xl font-bold text-zinc-900">{isLoading ? '—' : (metrics.requestsOpen ?? metrics.opportunitiesOpen)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+              <span className="rounded-lg bg-violet-50 p-2 text-violet-600"><DollarSign className="h-4 w-4" /></span>
+              <div>
+                <p className="text-xs text-zinc-500">Revenue Today</p>
+                <p className="text-2xl font-bold text-zinc-900">{isLoading ? '—' : formatMoney(metrics.approvedValueTodayCents)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4 sm:col-span-2">
+              <span className="rounded-lg bg-zinc-200 p-2 text-zinc-500"><RefreshCw className="h-4 w-4" /></span>
+              <div>
+                <p className="text-xs text-zinc-500">Total Contacts</p>
+                <p className="text-2xl font-bold text-zinc-900">{isLoading ? '—' : metrics.contactsTotal}</p>
+                <p className="text-xs text-zinc-400">All time</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent alerts */}
+        <div className="rounded-xl border border-zinc-200 bg-white">
+          <div className="border-b border-zinc-200 px-5 py-4">
+            <h2 className="font-semibold text-zinc-900">Recent Alerts</h2>
+            <p className="mt-0.5 text-xs text-zinc-500">Latest workflow notifications</p>
+          </div>
+          <div className="p-5">
+            {isLoading ? (
+              <p className="text-sm text-zinc-500">Loading alerts...</p>
+            ) : alerts.length === 0 ? (
+              <div className="py-8 text-center">
+                <CheckCircle className="mx-auto mb-2 h-7 w-7 text-zinc-200" />
+                <p className="text-sm text-zinc-500">No recent alerts</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {alerts.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
+                      {!item.readAt && (
+                        <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-700">New</span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-sm text-zinc-600">{item.body}</p>
+                    <p className="mt-1 text-xs text-zinc-400">{new Date(item.createdAt).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   )

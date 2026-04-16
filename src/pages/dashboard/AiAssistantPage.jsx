@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
-import { Copy, History, UserCircle2 } from 'lucide-react'
+import { Bot, Copy, FileText, History, UserCircle2, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 function toInt(value) {
@@ -331,8 +330,8 @@ function AssistantMessageContent({
       ) : null}
 
       {structured.kind === 'quote_preview' && displayDraft ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50/60 p-3 text-zinc-900">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Quote preview</p>
+        <div className="rounded-xl border border-zinc-200 bg-white p-3 text-zinc-900">
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Quote preview</p>
           {displayDraft.title ? (
             <p className="mt-1 text-sm font-semibold text-zinc-900">{displayDraft.title}</p>
           ) : null}
@@ -340,14 +339,14 @@ function AssistantMessageContent({
             <p className="mt-1 text-xs text-zinc-600">{displayDraft.quoteDescription}</p>
           ) : null}
           {(displayDraft.client?.fullName || displayDraft.client?.phone || displayDraft.client?.email) ? (
-            <div className="mt-2 rounded border border-emerald-100 bg-white/80 px-2 py-1.5 text-xs text-zinc-700">
+            <div className="mt-2 rounded border border-zinc-100 bg-zinc-50 px-2 py-1.5 text-xs text-zinc-700">
               {displayDraft.client.fullName ? <p className="font-medium">{displayDraft.client.fullName}</p> : null}
               {displayDraft.client.phone ? <p>{displayDraft.client.phone}</p> : null}
               {displayDraft.client.email ? <p>{displayDraft.client.email}</p> : null}
             </div>
           ) : null}
           {displayDraft.lineItems.length > 0 ? (
-            <div className="mt-2 max-h-40 overflow-y-auto rounded border border-emerald-100 bg-white/90">
+            <div className="mt-2 max-h-40 overflow-y-auto rounded border border-zinc-100 bg-white">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-zinc-200 bg-zinc-50 text-zinc-600">
@@ -380,7 +379,7 @@ function AssistantMessageContent({
           ) : (
             <p className="mt-2 text-xs text-zinc-500">No line items in this payload.</p>
           )}
-          <div className="mt-2 flex flex-wrap gap-2 border-t border-emerald-100 pt-2 text-xs">
+          <div className="mt-2 flex flex-wrap gap-2 border-t border-zinc-100 pt-2 text-xs">
             <span className="text-zinc-600">
               Subtotal ${(toInt(displayDraft.clientView.subtotalCents) / 100).toFixed(2)}
             </span>
@@ -490,6 +489,9 @@ function AiAssistantPage() {
   const [actionNotice, setActionNotice] = useState('')
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
+  const [pendingSeedHandoff, setPendingSeedHandoff] = useState(null)
+  const [pendingContactHandoff, setPendingContactHandoff] = useState(null)
+  const [isHandoffSaving, setIsHandoffSaving] = useState(false)
   const chatViewportRef = useRef(null)
   const chatBottomRef = useRef(null)
   const clientPickerRef = useRef(null)
@@ -516,6 +518,10 @@ function AiAssistantPage() {
       setIsLoadingThread(false)
       return
     }
+
+    // A handoff effect already loaded the thread (e.g. seed handoff cleared state after navigate).
+    // Avoid overwriting the seeded draft with the server's blank thread.
+    if (didLoadThreadRef.current) return
 
     let isCancelled = false
 
@@ -595,7 +601,6 @@ function AiAssistantPage() {
       try {
         setIsLoadingThread(true)
         setChatError('')
-        setActionNotice('')
         setIsCreatingNewChat(true)
 
         // Immediate draft preview: client block fills before network completes.
@@ -608,64 +613,18 @@ function AiAssistantPage() {
         const priorMessages = normalizeMessages(threadSnapshot?.messages)
         const priorClientId = String(threadSnapshot?.selectedClientId ?? '').trim()
         const hasUserTurn = priorMessages.some((m) => m.role === 'user')
+        const seed = location.state?.jobberRequestSeed
 
         if (hasUserTurn && priorClientId) {
-          try {
-            await apiRequest('/api/sales/ai-assistant/draft/save', { method: 'POST' })
-          } catch (saveErr) {
-            if (cancelled) return
-            setChatError(
-              saveErr?.message ||
-                'Could not save the previous quote draft. Fix the issue or save manually, then try Create Quote again.'
-            )
-            navigate(location.pathname, { replace: true, state: null })
-            return
-          }
+          // Ask the salesperson whether to save or discard the in-progress draft
+          const priorClientName =
+            String(threadSnapshot?.quoteDraft?.client?.fullName ?? '').trim() || 'the current client'
+          setPendingContactHandoff({ navKey, handoffContactId, handoffClient, seed: seed ?? null, priorClientName })
+          return
         }
 
-        const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
-        if (cancelled) return
-        setMessages(normalizeMessages(resetResponse?.messages))
-        if (resetResponse?.quoteDraft) {
-          setQuoteDraft(recalcDraft(applyHandoffClientToDraft(recalcDraft(resetResponse.quoteDraft), handoffClient)))
-        }
-
-        const clientResponse = await apiRequest('/api/sales/ai-assistant/thread/client', {
-          method: 'PATCH',
-          body: JSON.stringify({ selectedClientId: handoffContactId }),
-        })
-        if (cancelled) return
-
-        if (clientResponse?.quoteDraft) {
-          setQuoteDraft(recalcDraft(applyHandoffClientToDraft(recalcDraft(clientResponse.quoteDraft), handoffClient)))
-        }
-        if (Array.isArray(clientResponse?.messages)) {
-          setMessages(normalizeMessages(clientResponse.messages))
-        }
-        setSelectedClientId(clientResponse?.selectedClientId ?? handoffContactId)
-        setDraftUpdated(false)
-        didLoadThreadRef.current = true
-        processedCreateQuoteHandoffKeyRef.current = navKey
-
-        const seed = location.state?.jobberRequestSeed
-        if (seed && typeof seed === 'object') {
-          const t = String(seed.title ?? '').trim()
-          const d = String(seed.quoteDescription ?? '').trim()
-          setQuoteDraft((current) =>
-            recalcDraft({
-              ...current,
-              title: t || current.title,
-              quoteDescription: d || current.quoteDescription,
-            })
-          )
-        }
-
-        const savedNote = hasUserTurn && priorClientId ? 'Previous draft saved. ' : ''
-        setActionNotice(
-          `${savedNote}New chat started — client details are loaded in the quote draft for this contact.`
-        )
-        navigate(location.pathname, { replace: true, state: null })
-        requestAnimationFrame(() => scrollToLatest('auto'))
+        // No prior work — proceed directly
+        await continueContactHandoff({ handoffContactId, handoffClient, seed: seed ?? null, navKey })
       } catch (error) {
         if (cancelled) return
         setChatError(error?.message || 'Failed to start new chat from selected contact')
@@ -683,6 +642,143 @@ function AiAssistantPage() {
       cancelled = true
     }
   }, [location.key, location.state, location.pathname, navigate])
+
+  async function applyJobberSeed(seed, navKey, wasSaved) {
+    const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
+    setMessages(normalizeMessages(resetResponse?.messages))
+    const base = resetResponse?.quoteDraft ? recalcDraft(resetResponse.quoteDraft) : createDefaultQuoteDraft()
+    const t = String(seed.title ?? '').trim()
+    const d = String(seed.quoteDescription ?? '').trim()
+    setQuoteDraft(recalcDraft({ ...base, title: t || base.title, quoteDescription: d || base.quoteDescription }))
+    setSelectedClientId('')
+    setDraftUpdated(false)
+    // Persist seed fields to DB so they survive the first message send
+    if (t || d) {
+      await apiRequest('/api/sales/ai-assistant/thread/draft', {
+        method: 'PATCH',
+        body: JSON.stringify({ title: t || undefined, quoteDescription: d || undefined }),
+      })
+    }
+    didLoadThreadRef.current = true
+    processedJobberSeedHandoffKeyRef.current = navKey
+    navigate(location.pathname, { replace: true, state: null })
+    requestAnimationFrame(() => scrollToLatest('auto'))
+  }
+
+  async function handleSaveDraftAndContinue() {
+    if (!pendingSeedHandoff || isHandoffSaving) return
+    setIsHandoffSaving(true)
+    setChatError('')
+    try {
+      await apiRequest('/api/sales/ai-assistant/draft/save', { method: 'POST' })
+      await applyJobberSeed(pendingSeedHandoff.seed, pendingSeedHandoff.navKey, true)
+      setPendingSeedHandoff(null)
+    } catch (error) {
+      setChatError(error?.message || 'Failed to save previous draft')
+    } finally {
+      setIsHandoffSaving(false)
+    }
+  }
+
+  async function handleDiscardAndContinue() {
+    if (!pendingSeedHandoff || isHandoffSaving) return
+    setIsHandoffSaving(true)
+    try {
+      await applyJobberSeed(pendingSeedHandoff.seed, pendingSeedHandoff.navKey, false)
+      setPendingSeedHandoff(null)
+    } catch (error) {
+      setChatError(error?.message || 'Failed to start from Jobber request')
+    } finally {
+      setIsHandoffSaving(false)
+    }
+  }
+
+  async function continueContactHandoff({ handoffContactId, handoffClient, seed, navKey }) {
+    const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
+    setMessages(normalizeMessages(resetResponse?.messages))
+    if (resetResponse?.quoteDraft) {
+      setQuoteDraft(recalcDraft(applyHandoffClientToDraft(recalcDraft(resetResponse.quoteDraft), handoffClient)))
+    }
+
+    const clientResponse = await apiRequest('/api/sales/ai-assistant/thread/client', {
+      method: 'PATCH',
+      body: JSON.stringify({ selectedClientId: handoffContactId }),
+    })
+
+    if (clientResponse?.quoteDraft) {
+      setQuoteDraft(recalcDraft(applyHandoffClientToDraft(recalcDraft(clientResponse.quoteDraft), handoffClient)))
+    }
+    if (Array.isArray(clientResponse?.messages)) {
+      setMessages(normalizeMessages(clientResponse.messages))
+    }
+    setSelectedClientId(clientResponse?.selectedClientId ?? handoffContactId)
+    setDraftUpdated(false)
+    didLoadThreadRef.current = true
+    processedCreateQuoteHandoffKeyRef.current = navKey
+
+    if (seed && typeof seed === 'object') {
+      const t = String(seed.title ?? '').trim()
+      const d = String(seed.quoteDescription ?? '').trim()
+
+      if (t || d) {
+        await apiRequest('/api/sales/ai-assistant/thread/draft', {
+          method: 'PATCH',
+          body: JSON.stringify({ title: t || undefined, quoteDescription: d || undefined }),
+        })
+      }
+
+      const parts = ['New Jobber service request — please generate an initial quote draft.']
+      if (t) parts.push(`Service: ${t}`)
+      if (d) parts.push(`Request details:\n${d}`)
+      const autoPrompt = parts.join('\n\n')
+      if (autoPrompt) {
+        setIsSending(true)
+        try {
+          const aiResponse = await apiRequest('/api/sales/ai-assistant/chat', {
+            method: 'POST',
+            body: JSON.stringify({ prompt: autoPrompt, forceQuoteUpdate: true }),
+          })
+          setMessages(normalizeMessages(aiResponse?.messages))
+          if (aiResponse?.quoteDraft) setQuoteDraft(recalcDraft(aiResponse.quoteDraft))
+          setDraftUpdated(Boolean(aiResponse?.draftUpdated))
+        } finally {
+          setIsSending(false)
+        }
+      }
+    }
+
+    navigate(location.pathname, { replace: true, state: null })
+    requestAnimationFrame(() => scrollToLatest('auto'))
+  }
+
+  async function handleContactHandoffSaveDraftAndContinue() {
+    if (!pendingContactHandoff || isHandoffSaving) return
+    setIsHandoffSaving(true)
+    setChatError('')
+    try {
+      await apiRequest('/api/sales/ai-assistant/draft/save', { method: 'POST' })
+      await continueContactHandoff(pendingContactHandoff)
+      setPendingContactHandoff(null)
+    } catch (error) {
+      setChatError(error?.message || 'Failed to save previous draft')
+    } finally {
+      setIsHandoffSaving(false)
+    }
+  }
+
+  async function handleContactHandoffDiscardAndContinue() {
+    if (!pendingContactHandoff || isHandoffSaving) return
+    setIsHandoffSaving(true)
+    setChatError('')
+    try {
+      await continueContactHandoff(pendingContactHandoff)
+      setPendingContactHandoff(null)
+    } catch (error) {
+      setChatError(error?.message || 'Failed to start new quote')
+    } finally {
+      setIsHandoffSaving(false)
+    }
+  }
 
   useEffect(() => {
     const seed = location.state?.jobberRequestSeed
@@ -702,20 +798,21 @@ function AiAssistantPage() {
         setActionNotice('')
         setIsCreatingNewChat(true)
 
-        const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
+        const threadSnapshot = await apiRequest('/api/sales/ai-assistant/thread')
         if (cancelled) return
-        setMessages(normalizeMessages(resetResponse?.messages))
-        const base = resetResponse?.quoteDraft ? recalcDraft(resetResponse.quoteDraft) : createDefaultQuoteDraft()
-        const t = String(seed.title ?? '').trim()
-        const d = String(seed.quoteDescription ?? '').trim()
-        setQuoteDraft(recalcDraft({ ...base, title: t || base.title, quoteDescription: d || base.quoteDescription }))
-        setSelectedClientId('')
-        setDraftUpdated(false)
-        didLoadThreadRef.current = true
-        processedJobberSeedHandoffKeyRef.current = navKey
-        setActionNotice('Select a client, then use AI to build a quote from this Jobber request.')
-        navigate(location.pathname, { replace: true, state: null })
-        requestAnimationFrame(() => scrollToLatest('auto'))
+
+        const priorMessages = normalizeMessages(threadSnapshot?.messages)
+        const priorClientId = String(threadSnapshot?.selectedClientId ?? '').trim()
+        const hasUserTurn = priorMessages.some((m) => m.role === 'user')
+
+        if (hasUserTurn && priorClientId) {
+          const priorClientName =
+            String(threadSnapshot?.quoteDraft?.client?.fullName ?? '').trim() || 'current client'
+          setPendingSeedHandoff({ seed, navKey, priorClientName })
+          return
+        }
+
+        await applyJobberSeed(seed, navKey, false)
       } catch (error) {
         if (cancelled) return
         setChatError(error?.message || 'Failed to start from Jobber request')
@@ -1254,16 +1351,28 @@ function AiAssistantPage() {
 
   return (
     <>
-    <div className="h-full min-h-0 overflow-hidden">
-      <div className="flex h-full min-h-0 flex-row gap-4 overflow-hidden">
-        <Card className="flex h-full min-h-0 w-1/2 flex-col border-zinc-200 bg-white">
-          <CardHeader>
-            <CardTitle>Quote Draft</CardTitle>
-            <CardDescription>
-              AI suggestions appear here. You can edit before saving or sending.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="min-h-0 flex flex-1 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+      {location.state?.jobberRequestSeed ? (
+        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5">
+          <FileText className="h-4 w-4 shrink-0 text-sky-500" />
+          <p className="text-sm text-sky-800">
+            Building quote for:{' '}
+            <span className="font-semibold">
+              {String(location.state.jobberRequestSeed.title ?? '').trim() || 'this request'}
+            </span>
+          </p>
+        </div>
+      ) : null}
+      <div className="flex min-h-0 flex-1 flex-row gap-4 overflow-hidden">
+        <div className="flex h-full min-h-0 w-1/2 flex-col rounded-xl border border-zinc-200 bg-white">
+          <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 px-5 py-4">
+            <FileText className="h-4 w-4 shrink-0 text-sky-500" />
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-900">Quote Builder</h2>
+              <p className="text-xs text-zinc-500">Edit before saving or sending.</p>
+            </div>
+          </div>
+          <div className="min-h-0 flex flex-1 flex-col overflow-hidden px-5 pb-5 pt-4">
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_130px]">
                 <div className="space-y-1">
@@ -1637,38 +1746,39 @@ function AiAssistantPage() {
               </div>
               <Button
                 type="button"
-                className="bg-zinc-900 text-white hover:bg-zinc-800"
+                className="bg-sky-500 text-white hover:bg-sky-600"
                 onClick={handleApproveQuote}
                 disabled={!selectedClientId || isApprovingQuote || isSavingDraft}>
-                {isApprovingQuote ? 'Approving...' : 'Approve Quote'}
+                {isApprovingQuote ? 'Approving...' : 'Approve & Send'}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="flex h-full min-h-0 w-1/2 flex-col border-zinc-200 bg-white">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle>Chat</CardTitle>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="icon" onClick={() => setHistoryOpen(true)}>
-                  <History className="h-4 w-4" />
-                </Button>
-                <Button type="button" variant="outline" onClick={handleNewChat} disabled={isCreatingNewChat}>
-                  {isCreatingNewChat ? 'Creating...' : 'New Chat'}
-                </Button>
+        <div className="flex h-full min-h-0 w-1/2 flex-col rounded-xl border border-zinc-200 bg-white">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-100 px-5 py-4">
+            <div className="flex items-center gap-2">
+              <Bot className="h-4 w-4 shrink-0 text-sky-500" />
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-900">AI Assistant</h2>
+                <p className="text-xs text-zinc-500">Ask for pricing, adjustments, and suggestions.</p>
               </div>
             </div>
-            <CardDescription>
-              Ask for quote ideas, pricing adjustments, and follow-up suggestions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="icon" onClick={() => setHistoryOpen(true)}>
+                <History className="h-4 w-4" />
+              </Button>
+              <Button type="button" variant="outline" onClick={handleNewChat} disabled={isCreatingNewChat}>
+                {isCreatingNewChat ? 'Creating...' : 'New Chat'}
+              </Button>
+            </div>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 pb-5 pt-4">
             {chatError ? (
               <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{chatError}</p>
             ) : null}
             {actionNotice ? (
-              <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700">
                 {actionNotice}
               </p>
             ) : null}
@@ -1682,7 +1792,7 @@ function AiAssistantPage() {
                     key={message.id}
                     className={`max-w-[90%] rounded-lg px-3 py-2 text-sm ${
                       message.role === 'user'
-                        ? 'ml-auto bg-zinc-900 text-white'
+                        ? 'ml-auto bg-sky-500 text-white'
                         : 'bg-white text-zinc-800 border border-zinc-200'
                     }`}>
                     <AssistantMessageContent
@@ -1736,18 +1846,102 @@ function AiAssistantPage() {
             {selectedClientId && !isSending ? (
               <p className="text-xs text-zinc-500">{draftUpdated ? 'Draft updated from last message.' : 'Draft unchanged from last message.'}</p>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
+    {pendingSeedHandoff ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+        <div
+          className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-5 shadow-xl"
+          role="dialog"
+          aria-modal="true">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 shrink-0 text-sky-500" />
+            <h3 className="text-base font-bold text-zinc-900">Unsaved quote in progress</h3>
+          </div>
+          <p className="mt-3 text-sm text-zinc-600">
+            You have an active quote draft for{' '}
+            <span className="font-semibold text-zinc-900">{pendingSeedHandoff.priorClientName}</span>.
+            What would you like to do before starting this new request?
+          </p>
+          {chatError ? (
+            <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {chatError}
+            </p>
+          ) : null}
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDiscardAndContinue}
+              disabled={isHandoffSaving}>
+              Discard & Continue
+            </Button>
+            <Button
+              type="button"
+              className="bg-sky-500 text-white hover:bg-sky-600"
+              onClick={handleSaveDraftAndContinue}
+              disabled={isHandoffSaving}>
+              {isHandoffSaving ? 'Saving...' : 'Save Draft & Continue'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    {pendingContactHandoff ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+        <div
+          className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-5 shadow-xl"
+          role="dialog"
+          aria-modal="true">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 shrink-0 text-sky-500" />
+            <h3 className="text-base font-bold text-zinc-900">Unsaved quote in progress</h3>
+          </div>
+          <p className="mt-3 text-sm text-zinc-600">
+            You have an active quote draft for{' '}
+            <span className="font-semibold text-zinc-900">{pendingContactHandoff.priorClientName}</span>.
+            Would you like to save it before working on this new request?
+          </p>
+          {chatError ? (
+            <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {chatError}
+            </p>
+          ) : null}
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleContactHandoffDiscardAndContinue}
+              disabled={isHandoffSaving}>
+              Discard & Continue
+            </Button>
+            <Button
+              type="button"
+              className="bg-sky-500 text-white hover:bg-sky-600"
+              onClick={handleContactHandoffSaveDraftAndContinue}
+              disabled={isHandoffSaving}>
+              {isHandoffSaving ? 'Saving...' : 'Save Draft & Continue'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    ) : null}
     {historyOpen ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
         <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-4 shadow-lg">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-zinc-900">Past Chats</h2>
-            <Button type="button" variant="outline" onClick={() => setHistoryOpen(false)}>
-              Close
-            </Button>
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-sky-500" />
+              <h2 className="text-sm font-semibold text-zinc-900">Past Chats</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(false)}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700">
+              <X className="h-4 w-4" />
+            </button>
           </div>
           <Input
             value={historySearch}

@@ -1,9 +1,10 @@
-import { Card, CardContent } from '@/components/ui/card'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { apiRequest } from '@/lib/apiClient'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
+import { ClipboardList, FileText, CheckCircle, RefreshCw } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 function formatMoneyFromCents(cents) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100)
@@ -182,115 +183,226 @@ function QuotesPage() {
     }
   }
 
+  const draftCount = useMemo(() => quotes.filter((q) => q.status === 'draft').length, [quotes])
+  const approvedCount = useMemo(() => quotes.filter((q) => q.status === 'approved').length, [quotes])
+  const syncedCount = useMemo(() => quotes.filter((q) => q.jobberSyncStatus === 'synced').length, [quotes])
+  const hasActiveFilters = search.trim() || statusFilter !== 'all' || dateFilter !== 'all'
+
   return (
     <>
-    <Card className="border-zinc-200 bg-white">
-      <CardContent className="space-y-3">
-        <div className="flex justify-end">
-          <Button type="button" onClick={() => navigate('/dashboard/ai-assistant', { state: { startNewChat: true } })}>
-            Create Quote
-          </Button>
+      {/* Stats row */}
+      <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Total quotes</p>
+              <p className="mt-2 text-3xl font-bold text-zinc-900">{isLoading ? '—' : quotes.length}</p>
+              <p className="mt-0.5 text-xs text-zinc-400">All time</p>
+            </div>
+            <span className="rounded-lg bg-zinc-100 p-2 text-zinc-600">
+              <ClipboardList className="h-4 w-4" />
+            </span>
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search client or description..."
-          />
-          <select
-            className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-800 outline-none focus:border-zinc-400"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}>
-            <option value="all">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="approved">Approved</option>
-          </select>
-          <select
-            className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-800 outline-none focus:border-zinc-400"
-            value={dateFilter}
-            onChange={(event) => setDateFilter(event.target.value)}>
-            <option value="all">All dates</option>
-            <option value="7d">Last 7 days</option>
-            <option value="30d">Last 30 days</option>
-          </select>
+        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Drafts</p>
+              <p className="mt-2 text-3xl font-bold text-zinc-900">{isLoading ? '—' : draftCount}</p>
+              <p className="mt-0.5 text-xs text-zinc-400">In progress</p>
+            </div>
+            <span className="rounded-lg bg-amber-50 p-2 text-amber-600">
+              <FileText className="h-4 w-4" />
+            </span>
+          </div>
         </div>
-        {isLoading ? <p className="text-sm text-zinc-500">Loading quotes...</p> : null}
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        {!isLoading && !error && filteredQuotes.length === 0 ? (
-          <p className="text-sm text-zinc-500">No quotes yet. Save a draft from AI Assistant to get started.</p>
-        ) : null}
-        {!isLoading && !error && filteredQuotes.length > 0 ? (
-          <div className="overflow-hidden rounded-lg border border-zinc-200">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Approved</p>
+              <p className="mt-2 text-3xl font-bold text-zinc-900">{isLoading ? '—' : approvedCount}</p>
+              <p className="mt-0.5 text-xs text-zinc-400">Ready to sync</p>
+            </div>
+            <span className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
+              <CheckCircle className="h-4 w-4" />
+            </span>
+          </div>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Synced to Jobber</p>
+              <p className="mt-2 text-3xl font-bold text-zinc-900">{isLoading ? '—' : syncedCount}</p>
+              <p className="mt-0.5 text-xs text-zinc-400">Sent to Jobber</p>
+            </div>
+            <span className="rounded-lg bg-sky-50 p-2 text-sky-600">
+              <RefreshCw className="h-4 w-4" />
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main card */}
+      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <h2 className="font-semibold text-zinc-900">
+              {hasActiveFilters ? 'Filtered quotes' : 'All quotes'}
+            </h2>
+            {!isLoading && (
+              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
+                {filteredQuotes.length} {filteredQuotes.length === 1 ? 'result' : 'results'}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search quotes..."
+                className="h-9 w-52 text-sm"
+              />
+            </div>
+            <Button
+              type="button"
+              className="h-9 text-sm"
+              onClick={() => navigate('/dashboard/ai-assistant', { state: { startNewChat: true } })}>
+              + Create Quote
+            </Button>
+          </div>
+        </div>
+
+        {/* Filter pills row */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-zinc-50/60 px-5 py-2.5">
+          {['all', 'draft', 'approved'].map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setStatusFilter(status)}
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
+                statusFilter === status
+                  ? 'border-sky-500 bg-sky-500 text-white'
+                  : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100'
+              )}>
+              {status === 'all' ? 'All statuses' : status.charAt(0).toUpperCase() + status.slice(1)}
+            </button>
+          ))}
+          <div className="ml-auto flex items-center gap-2">
+            <select
+              className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none focus:border-zinc-400"
+              value={dateFilter}
+              onChange={(event) => setDateFilter(event.target.value)}>
+              <option value="all">All time</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+            </select>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                className="text-xs font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-800"
+                onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Error banner */}
+        {error && (
+          <div className="border-b border-red-100 bg-red-50 px-5 py-3">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {/* Loading */}
+        {isLoading && (
+          <p className="py-16 text-center text-sm text-zinc-500">Loading quotes...</p>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && filteredQuotes.length === 0 && (
+          <div className="py-16 text-center">
+            <ClipboardList className="mx-auto mb-3 h-8 w-8 text-zinc-300" />
+            <p className="text-sm font-medium text-zinc-600">
+              {quotes.length === 0 ? 'No quotes yet' : 'No quotes match your filters'}
+            </p>
+            <p className="mt-1 text-xs text-zinc-400">
+              {quotes.length === 0
+                ? 'Click "+ Create Quote" above to get started.'
+                : 'Try adjusting your search or clearing the filters.'}
+            </p>
+          </div>
+        )}
+
+        {/* Table */}
+        {!isLoading && filteredQuotes.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="border-b border-zinc-200 bg-white">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                    Client
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                    Quote Title
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                    Price
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                    Jobber
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                    Created
-                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Client</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Quote Title</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Price</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Jobber</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 bg-white">
+              <tbody className="divide-y divide-zinc-100">
                 {filteredQuotes.map((quote, index) => (
-                  <tr key={`${quote.createdAt}-${index}`} className="hover:bg-zinc-50">
-                    <td
-                      className="cursor-pointer px-4 py-3 text-sm text-zinc-800"
-                      onClick={() => openQuoteDetail(quote.id)}>
-                      {quote.client}
-                    </td>
-                    <td
-                      className="max-w-[520px] cursor-pointer px-4 py-3 text-sm text-zinc-800"
-                      onClick={() => openQuoteDetail(quote.id)}>
-                      <p className="line-clamp-1 font-medium">{quote.title}</p>
+                  <tr
+                    key={`${quote.createdAt}-${index}`}
+                    className="cursor-pointer transition-colors hover:bg-zinc-50"
+                    onClick={() => openQuoteDetail(quote.id)}>
+                    <td className="px-5 py-3.5 text-sm font-semibold text-zinc-900">{quote.client}</td>
+                    <td className="max-w-[400px] px-5 py-3.5">
+                      <p className="line-clamp-1 text-sm font-medium text-zinc-900">{quote.title}</p>
                       {quote.quoteDescription ? (
                         <p className="line-clamp-1 text-xs text-zinc-500">{quote.quoteDescription}</p>
                       ) : null}
                     </td>
-                    <td
-                      className="cursor-pointer px-4 py-3 text-sm font-medium text-zinc-900"
-                      onClick={() => openQuoteDetail(quote.id)}>
+                    <td className="px-5 py-3.5 text-sm font-medium text-zinc-900">
                       {formatMoneyFromCents(quote.amountCents)}
                     </td>
-                    <td className="cursor-pointer px-4 py-3" onClick={() => openQuoteDetail(quote.id)}>
-                      <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                          quote.status === 'draft'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-emerald-100 text-emerald-700'
-                        }`}>
+                    <td className="px-5 py-3.5">
+                      <span className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+                        quote.status === 'draft'
+                          ? 'border-amber-200 bg-amber-50 text-amber-700'
+                          : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      )}>
+                        <span className={cn('h-1.5 w-1.5 rounded-full', quote.status === 'draft' ? 'bg-amber-400' : 'bg-emerald-500')} />
                         {quote.status === 'draft' ? 'Draft' : 'Approved'}
                       </span>
                     </td>
-                    <td className="cursor-pointer px-4 py-3 text-xs" onClick={() => openQuoteDetail(quote.id)}>
+                    <td className="px-5 py-3.5 text-xs">
                       {quote.jobberSyncStatus === 'synced' ? (
-                        <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">Synced</span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Synced
+                        </span>
                       ) : quote.jobberSyncStatus === 'failed' ? (
-                        <span className="inline-flex rounded-full bg-red-100 px-2 py-1 font-semibold text-red-700">Failed</span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-400" />Failed
+                        </span>
                       ) : jobberReadinessByQuoteId[quote.id]?.ready ? (
-                        <span className="inline-flex rounded-full bg-sky-100 px-2 py-1 font-semibold text-sky-700">Ready</span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />Ready
+                        </span>
                       ) : quote.status === 'approved' ? (
-                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700">Pending</span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />Pending
+                        </span>
                       ) : (
-                        <span className="inline-flex rounded-full bg-zinc-100 px-2 py-1 font-semibold text-zinc-600">N/A</span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-500">
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />N/A
+                        </span>
                       )}
                     </td>
-                    <td
-                      className="cursor-pointer whitespace-nowrap px-4 py-3 text-sm text-zinc-600"
-                      onClick={() => openQuoteDetail(quote.id)}>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-sm text-zinc-500">
                       {formatRelativeTime(quote.createdAt)}
                     </td>
                   </tr>
@@ -298,9 +410,8 @@ function QuotesPage() {
               </tbody>
             </table>
           </div>
-        ) : null}
-      </CardContent>
-    </Card>
+        )}
+      </div>
     {selectedQuote || isLoadingQuoteDetail ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
         <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-4 shadow-lg">

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
+import { X } from 'lucide-react'
 
 const STATUS_CONFIG = {
   new:        { label: 'New',        dot: 'bg-blue-500',   text: 'text-blue-700',   bg: 'bg-blue-50'   },
@@ -42,6 +43,7 @@ function formatRequested(value) {
 }
 
 function formatFullDate(value) {
+  if (!value) return '—'
   try {
     return new Date(value).toLocaleString()
   } catch {
@@ -49,10 +51,35 @@ function formatFullDate(value) {
   }
 }
 
+const AVATAR_COLORS = [
+  'bg-blue-100 text-blue-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-violet-100 text-violet-700',
+  'bg-amber-100 text-amber-700',
+  'bg-rose-100 text-rose-700',
+  'bg-cyan-100 text-cyan-700',
+]
+
+function getInitials(name) {
+  return (name || '?')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() || '')
+    .join('')
+}
+
+function avatarColor(name) {
+  const code = (name || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  return AVATAR_COLORS[code % AVATAR_COLORS.length]
+}
+
 function buildQuoteSeed(item) {
   const parts = []
   if (item.title?.trim()) parts.push(`Request: ${item.title.trim()}`)
   if (item.companyName?.trim()) parts.push(`Company: ${item.companyName.trim()}`)
+  const address = [item.addressLine1, item.city, item.state, item.postalCode].filter(Boolean).join(', ')
+  if (address) parts.push(`Property: ${address}`)
   if (item.notes?.trim()) parts.push(item.notes.trim())
   if (item.jobberWebUri?.trim()) parts.push(`Open in Jobber: ${item.jobberWebUri.trim()}`)
   return {
@@ -136,7 +163,7 @@ function RequestsPage() {
                 fullName: item.name || '',
                 phone: item.phone || '',
                 email: item.email || '',
-                address: [item.city, item.state, item.postalCode].filter(Boolean).join(', '),
+                address: [item.addressLine1, item.city, item.state, item.postalCode].filter(Boolean).join(', '),
               },
             }
           : { startNewChat: true }),
@@ -256,7 +283,6 @@ function RequestsPage() {
                   <th className="px-4 py-3">Property</th>
                   <th className="px-4 py-3">Contact</th>
                   <th className="px-4 py-3">Requested</th>
-                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -295,16 +321,12 @@ function RequestsPage() {
                     <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">
                       {formatRequested(item.createdAt)}
                     </td>
-                    {/* Status */}
-                    <td className="px-4 py-3">
-                      <StatusBadge status={item.status} />
-                    </td>
                     {/* AI action */}
                     <td className="px-4 py-3">
                       <Button
                         type="button"
                         size="sm"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap bg-green-600 hover:bg-green-700 text-white text-xs"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-xs"
                         onClick={(e) => handleContinueWithAI(item, e)}>
                         Continue with AI
                       </Button>
@@ -320,64 +342,189 @@ function RequestsPage() {
       {/* Detail modal */}
       {selected ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
           onClick={() => setSelected(null)}>
           <div
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-zinc-200 bg-white p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-start justify-between gap-2">
-              <div>
-                <h2 className="text-lg font-semibold text-zinc-900">{selected.name || 'Request'}</h2>
+            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true">
+
+            {/* Header */}
+            <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-5 py-4">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${avatarColor(selected.name)}`}>
+                {getInitials(selected.name)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-base font-bold text-zinc-900">{selected.name || 'Request'}</h2>
                 {selected.companyName ? (
-                  <p className="text-sm text-zinc-500">{selected.companyName}</p>
+                  <p className="truncate text-xs text-zinc-500">{selected.companyName}</p>
                 ) : null}
               </div>
-              <StatusBadge status={selected.status} />
+              <div className="flex shrink-0 items-center gap-2">
+                <StatusBadge status={selected.status} />
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3 text-sm">
+            {/* Scrollable body */}
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm">
               {selected.title ? (
                 <div>
-                  <p className="text-xs font-medium text-zinc-400 uppercase">Title</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Title</p>
                   <p className="mt-0.5 text-zinc-800">{selected.title}</p>
                 </div>
               ) : null}
+
               {(selected.phone || selected.email) ? (
                 <div>
-                  <p className="text-xs font-medium text-zinc-400 uppercase">Contact</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Contact</p>
                   {selected.phone ? <p className="mt-0.5 text-zinc-800">{selected.phone}</p> : null}
-                  {selected.email ? <p className="text-zinc-500">{selected.email}</p> : null}
+                  {selected.email ? <p className="text-xs text-zinc-500">{selected.email}</p> : null}
                 </div>
               ) : null}
+
+              {(selected.addressLine1 || selected.city || selected.state || selected.postalCode) ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Address</p>
+                  <p className="mt-0.5 text-zinc-800">
+                    {[
+                      selected.addressLine1,
+                      [selected.city, selected.state, selected.postalCode].filter(Boolean).join(', '),
+                    ].filter(Boolean).join(', ')}
+                  </p>
+                </div>
+              ) : null}
+
+              {selected.property ? (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Property</p>
+                  <div className="space-y-1 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5 text-zinc-800">
+                    <p>{selected.property.address || '—'}</p>
+                    <p className="text-xs text-zinc-500">
+                      {[selected.property.city, selected.property.province, selected.property.postalCode, selected.property.country].filter(Boolean).join(', ') || '—'}
+                    </p>
+                    {selected.property.id ? (
+                      <p className="text-xs text-zinc-500">Property ID: {selected.property.id}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
               <div>
-                <p className="text-xs font-medium text-zinc-400 uppercase">Requested</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Requested</p>
                 <p className="mt-0.5 text-zinc-800">{formatFullDate(selected.createdAt)}</p>
               </div>
-              {selected.notes ? (
+
+              {(selected.updatedAt || selected.requestStatus || selected.source) ? (
                 <div>
-                  <p className="text-xs font-medium text-zinc-400 uppercase">Assessment / Notes</p>
-                  <p className="mt-0.5 whitespace-pre-wrap text-zinc-800">{selected.notes}</p>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Request metadata</p>
+                  <div className="space-y-1 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5 text-zinc-800">
+                    {selected.requestStatus ? <p>Status: {selected.requestStatus}</p> : null}
+                    {selected.source ? <p>Source: {selected.source}</p> : null}
+                    {selected.updatedAt ? <p>Updated: {formatFullDate(selected.updatedAt)}</p> : null}
+                    {selected.arrivalWindow?.startAt || selected.arrivalWindow?.endAt ? (
+                      <p>
+                        Arrival window: {formatFullDate(selected.arrivalWindow?.startAt)} - {formatFullDate(selected.arrivalWindow?.endAt)}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
+
+              {selected.salesperson?.name ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Salesperson</p>
+                  <p className="mt-0.5 text-zinc-800">{selected.salesperson.name}</p>
+                </div>
+              ) : null}
+
+              {selected.assessmentInstructions ? (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Assessment instructions</p>
+                  <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5">
+                    <p className="whitespace-pre-wrap text-zinc-800">{selected.assessmentInstructions}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              {Array.isArray(selected.lineItems) && selected.lineItems.length > 0 ? (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Line items</p>
+                  <div className="space-y-2">
+                    {selected.lineItems.map((item, idx) => (
+                      <div key={`${item?.id || idx}`} className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2">
+                        <p className="text-sm font-medium text-zinc-800">{item?.name || item?.materialName || 'Line item'}</p>
+                        {item?.description ? <p className="text-xs text-zinc-500">{item.description}</p> : null}
+                        <p className="text-xs text-zinc-500">
+                          Qty: {item?.quantity ?? '—'}
+                          {item?.unitPrice !== undefined ? ` | Unit: ${item.unitPrice}` : ''}
+                          {item?.totalCost !== undefined ? ` | Total: ${item.totalCost}` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {Array.isArray(selected.notesList) && selected.notesList.length > 0 ? (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Notes</p>
+                  <div className="space-y-2">
+                    {selected.notesList.map((note, idx) => (
+                      <div key={`${note?.id || idx}`} className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2">
+                        <p className="whitespace-pre-wrap text-sm text-zinc-800">{note?.message || note?.content || '—'}</p>
+                        {note?.createdAt ? <p className="mt-1 text-xs text-zinc-500">{formatFullDate(note.createdAt)}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {Array.isArray(selected.noteAttachments) && selected.noteAttachments.length > 0 ? (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Note attachments</p>
+                  <div className="space-y-1">
+                    {selected.noteAttachments.map((att, idx) => (
+                      <div key={`${att?.id || idx}`} className="text-sm">
+                        {att?.url ? (
+                          <a
+                            href={att.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sky-600 underline underline-offset-2 hover:text-sky-700">
+                            {att?.fileName || att?.name || 'Attachment'}
+                          </a>
+                        ) : (
+                          <span className="text-zinc-600">{att?.fileName || att?.name || 'Attachment'}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               {selected.jobberWebUri ? (
                 <a
                   href={selected.jobberWebUri}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-blue-600 underline hover:text-blue-700">
+                  className="inline-flex items-center gap-1 text-sky-600 underline underline-offset-2 hover:text-sky-700">
                   Open in Jobber ↗
                 </a>
               ) : null}
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setSelected(null)}>
-                Close
-              </Button>
+            {/* Footer */}
+            <div className="shrink-0 border-t border-zinc-100 px-5 py-4">
               <Button
                 type="button"
-                size="sm"
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="w-full bg-sky-500 text-white hover:bg-sky-600"
                 onClick={() => handleContinueWithAI(selected)}>
                 Continue with AI
               </Button>

@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
 import { cn } from '@/lib/utils'
@@ -40,9 +38,6 @@ function sourceBadge(source) {
 }
 
 function ContactsPage() {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const shouldOpenCreateFromQuickAction = Boolean(location.state?.openCreate)
   const [contacts, setContacts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -52,16 +47,9 @@ function ContactsPage() {
   const [selectedContactName, setSelectedContactName] = useState('')
   const [deleteModalContact, setDeleteModalContact] = useState(null)
   const [updateModalContact, setUpdateModalContact] = useState(null)
-  const [showCreateForm, setShowCreateForm] = useState(shouldOpenCreateFromQuickAction)
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
-  const [formData, setFormData] = useState({
-    firstName: '', middleName: '', lastName: '',
-    email: '', phone: '',
-    addressLine1: '', addressLine2: '',
-    city: '', state: 'AL', postalCode: '',
-  })
   const [updateFormData, setUpdateFormData] = useState({
     firstName: '', middleName: '', lastName: '',
     email: '', phone: '',
@@ -120,41 +108,6 @@ function ContactsPage() {
     void loadContacts()
     return () => { cancelled = true }
   }, [])
-
-  useEffect(() => {
-    if (shouldOpenCreateFromQuickAction) setShowCreateForm(true)
-  }, [shouldOpenCreateFromQuickAction])
-
-  function handleInputChange(event) {
-    const { name, value } = event.target
-    setFormData((current) => ({ ...current, [name]: value }))
-  }
-
-  async function handleCreateContact(event) {
-    event.preventDefault()
-    setIsSubmitting(true)
-    setErrorMessage('')
-    try {
-      const result = await apiRequest('/api/sales/contacts', {
-        method: 'POST',
-        body: JSON.stringify({
-          firstName: formData.firstName, middleName: formData.middleName, lastName: formData.lastName,
-          email: formData.email, phone: formData.phone,
-          addressLine1: formData.addressLine1, addressLine2: formData.addressLine2,
-          city: formData.city, state: formData.state, postalCode: formData.postalCode,
-        }),
-      })
-      const created = result.contact
-      setContacts((current) => [created, ...current])
-      setFormData({ firstName: '', middleName: '', lastName: '', email: '', phone: '', addressLine1: '', addressLine2: '', city: '', state: 'AL', postalCode: '' })
-      setSelectedContactName(`${created.name} - Created`)
-      setShowCreateForm(false)
-    } catch (error) {
-      setErrorMessage(error?.message || 'Failed to create contact')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   function handleContactClick(contact) {
     setSelectedContactName(contact.name)
@@ -233,28 +186,6 @@ function ContactsPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  function handleCreateQuoteFromContact(contact) {
-    setSelectedContactDetail(null)
-    const contactAddress = [
-      contact.addressLine1,
-      contact.addressLine2,
-      [contact.city, contact.state, contact.postalCode].filter(Boolean).join(' '),
-    ].filter(Boolean).join(', ')
-    navigate('/dashboard/ai-assistant', {
-      state: {
-        contactId: contact.id,
-        startNewChat: true,
-        handoffClient: {
-          fullName: contact.name || '',
-          phone: contact.phone || '',
-          email: contact.email || '',
-          address: contactAddress,
-        },
-      },
-    })
-    setSelectedContactName(`${contact.name || 'Contact'} - Create Quote`)
   }
 
   function formatRelativeTime(iso) {
@@ -356,22 +287,14 @@ function ContactsPage() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search contacts..."
-                className="h-9 w-52 pl-8 text-sm"
-              />
-            </div>
-            <Button
-              type="button"
-              onClick={() => setShowCreateForm((v) => !v)}
-              className="h-9 text-sm">
-              {showCreateForm ? 'Cancel' : '+ New Contact'}
-            </Button>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search contacts..."
+              className="h-9 w-52 pl-8 text-sm"
+            />
           </div>
         </div>
 
@@ -385,7 +308,7 @@ function ContactsPage() {
               className={cn(
                 'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
                 sourceFilter === source
-                  ? 'border-zinc-900 bg-zinc-900 text-white'
+                  ? 'border-sky-500 bg-sky-500 text-white'
                   : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100'
               )}>
               {source === 'all' ? 'All sources' : titleCase(source)}
@@ -411,69 +334,6 @@ function ContactsPage() {
           </div>
         </div>
 
-        {/* Create form */}
-        {showCreateForm && (
-          <div className="border-b border-zinc-200 px-5 py-5">
-            <p className="mb-4 text-sm font-semibold text-zinc-700">New contact</p>
-            <form onSubmit={handleCreateContact} className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" name="firstName" placeholder="First name" value={formData.firstName} onChange={handleInputChange} required />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="middleName">Middle Name</Label>
-                  <Input id="middleName" name="middleName" placeholder="Middle name" value={formData.middleName} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" name="lastName" placeholder="Last name" value={formData.lastName} onChange={handleInputChange} required />
-                </div>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" name="phone" placeholder="Phone" value={formData.phone} onChange={handleInputChange} />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="addressLine1">Address Line 1</Label>
-                <Input id="addressLine1" name="addressLine1" placeholder="Street address" value={formData.addressLine1} onChange={handleInputChange} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="addressLine2">Address Line 2</Label>
-                <Input id="addressLine2" name="addressLine2" placeholder="Apartment, suite, etc." value={formData.addressLine2} onChange={handleInputChange} />
-              </div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="city">City</Label>
-                  <Input id="city" name="city" placeholder="City" value={formData.city} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="state">State</Label>
-                  <Input id="state" name="state" placeholder="AL" maxLength={2} value={formData.state} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="postalCode">ZIP Code</Label>
-                  <Input id="postalCode" name="postalCode" placeholder="ZIP" value={formData.postalCode} onChange={handleInputChange} />
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Creating...' : 'Create Contact'}
-                </Button>
-                <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => { setShowCreateForm(false); setErrorMessage('') }}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </div>
-        )}
-
         {/* Error banner */}
         {errorMessage && (
           <div className="border-b border-red-100 bg-red-50 px-5 py-3">
@@ -495,7 +355,7 @@ function ContactsPage() {
             </p>
             <p className="mt-1 text-xs text-zinc-400">
               {contacts.length === 0
-                ? 'Click "+ New Contact" above to get started.'
+                ? 'Contacts are synced automatically from Jobber.'
                 : 'Try adjusting your search or clearing the filters.'}
             </p>
           </div>
@@ -604,7 +464,6 @@ function ContactsPage() {
             <div className="mt-4 flex flex-wrap gap-2">
               <Button type="button" onClick={() => openUpdateModal(selectedContactDetail)}>Edit Contact</Button>
               <Button type="button" variant="outline" onClick={() => openDeleteModal(selectedContactDetail)}>Delete Contact</Button>
-              <Button type="button" variant="outline" onClick={() => handleCreateQuoteFromContact(selectedContactDetail)}>Create Quote</Button>
             </div>
           </div>
         </div>

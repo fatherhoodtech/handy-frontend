@@ -1,24 +1,113 @@
 import {
   Bell,
-  Bot,
+  CheckCheck,
   ClipboardList,
   LayoutDashboard,
   ListFilter,
   Mail,
   Settings,
+  Trash2,
+  X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthContext'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '@/lib/apiClient'
 
 function DashboardPage() {
+  // NotificationPanel is defined as an inner component so it can close over state
+  function NotificationPanel() {
+    return (
+      <div className="absolute right-0 top-full z-50 mt-2 flex w-80 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-zinc-500" />
+            <h2 className="text-sm font-semibold text-zinc-900">Notifications</h2>
+            {unreadCount > 0 && (
+              <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {unreadCount}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsNotificationsOpen(false)}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Action bar */}
+        {notifications.length > 0 && (
+          <div className="flex items-center gap-1 border-b border-zinc-100 px-3 py-2">
+            <button
+              type="button"
+              onClick={markAllRead}
+              title="Mark all as read"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
+              <CheckCheck className="h-3.5 w-3.5" />
+              Mark all read
+            </button>
+            <button
+              type="button"
+              onClick={clearAllNotifications}
+              title="Clear all notifications"
+              className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 hover:text-red-700">
+              <Trash2 className="h-3.5 w-3.5" />
+              Clear all
+            </button>
+          </div>
+        )}
+
+        {/* Error */}
+        {notificationError && (
+          <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-600">
+            {notificationError}
+          </p>
+        )}
+
+        {/* List */}
+        <div className="max-h-[420px] overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10">
+              <Bell className="mb-2 h-7 w-7 text-zinc-200" />
+              <p className="text-sm text-zinc-500">No notifications yet</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-zinc-100">
+              {notifications.map((item) => (
+                <div key={item.id} className={cn('px-4 py-3 transition-colors hover:bg-zinc-50', !item.readAt && 'bg-sky-50/40')}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      {!item.readAt && <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />}
+                      <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => clearNotification(item.id)}
+                      title="Dismiss"
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-600">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <p className="mt-0.5 text-xs text-zinc-600">{item.body}</p>
+                  <p className="mt-1 text-[11px] text-zinc-400">{new Date(item.createdAt).toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [notificationError, setNotificationError] = useState('')
+  const notificationPanelRef = useRef(null)
 
   const location = useLocation()
   const navigate = useNavigate()
@@ -35,18 +124,29 @@ function DashboardPage() {
     { to: '/dashboard/overview', label: 'Overview', icon: LayoutDashboard },
     { to: '/dashboard/contacts', label: 'Contacts', icon: Mail },
     { to: '/dashboard/requests', label: 'Requests', icon: ListFilter },
-    { to: '/dashboard/ai-assistant', label: 'AI Assistant', icon: Bot },
     { to: '/dashboard/quotes', label: 'Quotes', icon: ClipboardList },
     { to: '/dashboard/settings', label: 'Settings', icon: Settings },
   ]
+  const allRouteLabels = [
+    ...navItems.map((item) => ({ to: item.to, label: item.label })),
+    { to: '/dashboard/ai-assistant', label: 'Quote Builder' },
+  ]
   const pageTitle =
-    navItems.find((item) => location.pathname.startsWith(item.to))?.label || 'Overview'
+    allRouteLabels.find((item) => location.pathname.startsWith(item.to))?.label || 'Overview'
   const pageHeading = pageTitle === 'Quotes' ? 'Quote' : pageTitle
   const pageSubtitle =
-    pageTitle === 'Quotes'
-      ? 'Track drafts and approvals for sales follow-up.'
-      : 'Today is a great day to move your pipeline forward.'
-  const hidePageHeader = pageTitle === 'AI Assistant'
+    pageTitle === 'Quotes' ? 'Track drafts and approvals for sales follow-up.' : ''
+  useEffect(() => {
+    if (!isNotificationsOpen) return
+    function handleClickOutside(event) {
+      if (notificationPanelRef.current && !notificationPanelRef.current.contains(event.target)) {
+        setIsNotificationsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isNotificationsOpen])
+
   useEffect(() => {
     let cancelled = false
     async function loadNotifications() {
@@ -129,7 +229,7 @@ function DashboardPage() {
                   cn(
                     'flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors',
                     isActive
-                      ? 'border-zinc-900 bg-zinc-900 text-white'
+                      ? 'border-sky-500 bg-sky-500 text-white'
                       : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-100'
                   )
                 }>
@@ -144,83 +244,34 @@ function DashboardPage() {
         </aside>
 
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden p-6 sm:p-8">
-          {!hidePageHeader ? (
-            <div className="mb-6 mt-10">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight">{pageHeading}</h1>
-                  <p className="mt-1 text-zinc-500">{pageSubtitle}</p>
-                </div>
-                <Button type="button" variant="outline" className="relative" onClick={() => setIsNotificationsOpen(true)}>
-                  <Bell className="mr-2 h-4 w-4" />
-                  Notifications
-                  {unreadCount > 0 ? (
-                    <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
+          <div className="mb-6 mt-10">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">{pageHeading}</h1>
+                {pageSubtitle && <p className="mt-1 text-zinc-500">{pageSubtitle}</p>}
+              </div>
+              <div className="relative" ref={notificationPanelRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsNotificationsOpen((v) => !v)}
+                  className="relative flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-500 transition-colors hover:bg-sky-100 hover:text-sky-600">
+                  <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
-                  ) : null}
-                </Button>
+                  )}
+                </button>
+                {isNotificationsOpen && <NotificationPanel />}
               </div>
             </div>
-          ) : (
-            <div className="mb-3 flex justify-end">
-              <Button type="button" variant="outline" className="relative" onClick={() => setIsNotificationsOpen(true)}>
-                <Bell className="mr-2 h-4 w-4" />
-                Notifications
-                {unreadCount > 0 ? (
-                  <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                ) : null}
-              </Button>
-            </div>
-          )}
+          </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <Outlet />
           </div>
         </section>
 
       </div>
-      {isNotificationsOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-4 shadow-lg">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold text-zinc-900">Notifications</h2>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" onClick={markAllRead}>
-                  Mark all read
-                </Button>
-                <Button type="button" variant="outline" onClick={clearAllNotifications}>
-                  Clear all
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setIsNotificationsOpen(false)}>
-                  Close
-                </Button>
-              </div>
-            </div>
-            {notificationError ? <p className="mb-2 text-sm text-red-600">{notificationError}</p> : null}
-            <div className="max-h-96 space-y-2 overflow-y-auto">
-              {notifications.length === 0 ? (
-                <p className="text-sm text-zinc-500">No notifications yet.</p>
-              ) : notifications.map((item) => (
-                <div key={item.id} className="rounded-lg border border-zinc-200 p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
-                    <div className="flex items-center gap-2">
-                      {!item.readAt ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-700">Unread</span> : null}
-                      <Button type="button" variant="outline" size="sm" onClick={() => clearNotification(item.id)}>
-                        Clear
-                      </Button>
-                    </div>
-                  </div>
-                  <p className="mt-1 text-sm text-zinc-700">{item.body}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{new Date(item.createdAt).toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </main>
   )
 }
