@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
@@ -49,6 +50,32 @@ function formatFullDate(value) {
   } catch {
     return value
   }
+}
+
+function formatCurrency(value) {
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return ''
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
+}
+
+function resolveRequestValue(item) {
+  const candidates = [
+    item?.requestValue,
+    item?.opportunityValue,
+    item?.amount,
+    item?.value,
+  ]
+  for (const candidate of candidates) {
+    const amount = Number(candidate)
+    if (Number.isFinite(amount) && amount > 0) return amount
+  }
+  return null
+}
+
+function resolveLeadCost(item) {
+  const amount = Number(item?.thumbtackDetails?.leadPrice)
+  if (Number.isFinite(amount) && amount > 0) return amount
+  return null
 }
 
 function toText(value) {
@@ -520,12 +547,13 @@ function RequestsPage() {
       </div>
 
       {/* Detail modal */}
-      {selected ? (
+      {selected && typeof document !== 'undefined'
+        ? createPortal((
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4"
           onClick={() => setSelected(null)}>
           <div
-            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl"
+            className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true">
@@ -546,7 +574,9 @@ function RequestsPage() {
                 <button
                   type="button"
                   onClick={() => setSelected(null)}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700">
+                  aria-label="Close"
+                  title="Close"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -554,32 +584,51 @@ function RequestsPage() {
 
             {/* Scrollable body */}
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm">
-              {selected.title ? (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Title</p>
-                  <p className="mt-0.5 text-zinc-800">{selected.title}</p>
-                </div>
-              ) : null}
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {selected.title ? (
+                  <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm lg:col-span-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 basis-4/5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Request title</p>
+                        <p className="mt-1 text-lg font-semibold leading-tight text-zinc-900">{selected.title}</p>
+                      </div>
+                      <div className="basis-1/5 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-right">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Lead value</p>
+                        <p className="text-base font-semibold text-zinc-900">
+                          {formatCurrency(resolveRequestValue(selected)) || '—'}
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-500">
+                          Lead cost: {formatCurrency(resolveLeadCost(selected)) || '—'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
-              {(selected.phone || selected.email) ? (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Contact</p>
-                  {selected.phone ? <p className="mt-0.5 text-zinc-800">{selected.phone}</p> : null}
-                  {selected.email ? <p className="text-xs text-zinc-500">{selected.email}</p> : null}
-                </div>
-              ) : null}
+                {(selected.phone || selected.email || selected.addressLine1 || selected.city || selected.state || selected.postalCode) ? (
+                  <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Contact</p>
+                    {selected.phone ? <p className="mt-1 text-sm text-zinc-800"><span className="font-semibold">Phone:</span> {selected.phone}</p> : null}
+                    {selected.email ? <p className="text-sm text-zinc-700"><span className="font-semibold">Email:</span> {selected.email}</p> : null}
+                    {(selected.addressLine1 || selected.city || selected.state || selected.postalCode) ? (
+                      <p className="mt-1 text-sm text-zinc-700">
+                        <span className="font-semibold">Address:</span> {[
+                          selected.addressLine1,
+                          [selected.city, selected.state, selected.postalCode].filter(Boolean).join(', '),
+                        ].filter(Boolean).join(', ')}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
 
-              {(selected.addressLine1 || selected.city || selected.state || selected.postalCode) ? (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Address</p>
-                  <p className="mt-0.5 text-zinc-800">
-                    {[
-                      selected.addressLine1,
-                      [selected.city, selected.state, selected.postalCode].filter(Boolean).join(', '),
-                    ].filter(Boolean).join(', ')}
-                  </p>
+                <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Request details</p>
+                  <p className="mt-1 text-sm text-zinc-700">Requested: {formatFullDate(selected.createdAt)}</p>
+                  {selected.requestStatus ? <p className="text-sm text-zinc-700">Status: {selected.requestStatus}</p> : null}
+                  {selected.source ? <p className="text-sm text-zinc-700">Source: {selected.source}</p> : null}
+                  {selected.updatedAt ? <p className="text-sm text-zinc-700">Updated: {formatFullDate(selected.updatedAt)}</p> : null}
                 </div>
-              ) : null}
+              </div>
 
               {selected.property ? (
                 <div>
@@ -596,23 +645,11 @@ function RequestsPage() {
                 </div>
               ) : null}
 
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Requested</p>
-                <p className="mt-0.5 text-zinc-800">{formatFullDate(selected.createdAt)}</p>
-              </div>
-
-              {(selected.updatedAt || selected.requestStatus || selected.source) ? (
+              {(selected.arrivalWindow?.startAt || selected.arrivalWindow?.endAt) ? (
                 <div>
-                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Request metadata</p>
-                  <div className="space-y-1 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5 text-zinc-800">
-                    {selected.requestStatus ? <p>Status: {selected.requestStatus}</p> : null}
-                    {selected.source ? <p>Source: {selected.source}</p> : null}
-                    {selected.updatedAt ? <p>Updated: {formatFullDate(selected.updatedAt)}</p> : null}
-                    {selected.arrivalWindow?.startAt || selected.arrivalWindow?.endAt ? (
-                      <p>
-                        Arrival window: {formatFullDate(selected.arrivalWindow?.startAt)} - {formatFullDate(selected.arrivalWindow?.endAt)}
-                      </p>
-                    ) : null}
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Arrival window</p>
+                  <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5 text-zinc-800">
+                    {formatFullDate(selected.arrivalWindow?.startAt)} - {formatFullDate(selected.arrivalWindow?.endAt)}
                   </div>
                 </div>
               ) : null}
@@ -781,7 +818,7 @@ function RequestsPage() {
             <div className="shrink-0 border-t border-zinc-100 px-5 py-4">
               <Button
                 type="button"
-                className="w-full bg-sky-500 text-white hover:bg-sky-600"
+                className="ml-auto block bg-sky-500 text-white hover:bg-sky-600"
                 onClick={() => handleContinueWithAI(selected)}>
                 Continue with AI
               </Button>
@@ -797,7 +834,8 @@ function RequestsPage() {
             </div>
           </div>
         </div>
-      ) : null}
+      ), document.body)
+        : null}
 
       {showManualForm ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setShowManualForm(false)}>
@@ -876,7 +914,7 @@ function RequestsPage() {
             </div>
           </div>
         </div>
-      ) : null}
+        ) : null}
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { apiRequest } from '@/lib/apiClient'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, FileText, CheckCircle, RefreshCw } from 'lucide-react'
+import { ClipboardList, FileText, CheckCircle, RefreshCw, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   buildLegacyQuoteContinueState,
@@ -26,6 +26,15 @@ function formatRelativeTime(iso) {
   if (diffMs < day) return `${Math.floor(diffMs / hour)}h ago`
   if (diffMs < 7 * day) return `${Math.floor(diffMs / day)}d ago`
   return new Date(iso).toLocaleDateString()
+}
+
+function normalizeMissingFields(readiness) {
+  const fields = Array.isArray(readiness?.missingFields) ? readiness.missingFields : []
+  return fields.map((value) => String(value || '').trim()).filter(Boolean)
+}
+
+function contactMissingFieldsFromReadiness(readiness) {
+  return normalizeMissingFields(readiness).filter((field) => field.startsWith('client.'))
 }
 
 function QuotesPage() {
@@ -133,6 +142,21 @@ function QuotesPage() {
     } catch (err) {
       setError(err?.message || 'Failed to continue this quote in AI Assistant')
     }
+  }
+
+  function handleEditContactForQuote(quote) {
+    navigate('/dashboard/contacts', {
+      state: {
+        openContactEdit: true,
+        contactHint: {
+          id: String(quote?.contactId ?? '').trim(),
+          name: String(quote?.client ?? '').trim(),
+          email: String(quote?.clientEmail ?? '').trim(),
+          phone: String(quote?.clientPhone ?? '').trim(),
+        },
+        missingContactFields: contactMissingFieldsFromReadiness(jobberReadinessByQuoteId[quote?.id]),
+      },
+    })
   }
 
   function openDeleteQuoteModal(quote) {
@@ -436,11 +460,18 @@ function QuotesPage() {
       </div>
     {selectedQuote || isLoadingQuoteDetail ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-        <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-4 shadow-lg">
-          <div className="mb-3 flex items-center justify-between">
+        <div className="w-full max-w-3xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl">
+          <div className="mb-4 flex items-center justify-between border-b border-zinc-100 pb-3">
             <h2 className="text-lg font-semibold text-zinc-900">Quote Details</h2>
-            <Button type="button" variant="outline" onClick={() => setSelectedQuote(null)} disabled={isLoadingQuoteDetail}>
-              Close
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 w-8 p-0 text-zinc-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+              aria-label="Close"
+              title="Close"
+              onClick={() => setSelectedQuote(null)}
+              disabled={isLoadingQuoteDetail}>
+              <X className="h-4 w-4" />
             </Button>
           </div>
           {isLoadingQuoteDetail ? (
@@ -452,56 +483,60 @@ function QuotesPage() {
                   {syncNotice}
                 </p>
               ) : null}
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <p className="text-sm text-zinc-700"><span className="font-semibold">Client:</span> {selectedQuote.client}</p>
-                <p className="text-sm text-zinc-700"><span className="font-semibold">Status:</span> {selectedQuote.status}</p>
-                <p className="text-sm text-zinc-700"><span className="font-semibold">Price:</span> {formatMoneyFromCents(selectedQuote.amountCents)}</p>
-                <p className="text-sm text-zinc-700"><span className="font-semibold">Created:</span> {new Date(selectedQuote.createdAt).toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-zinc-800">Jobber Sync</p>
-                <p className="text-sm text-zinc-700">
-                  {selectedQuote.jobberSyncStatus === 'synced'
-                    ? `Synced${selectedQuote.jobberQuoteId ? ` (Quote ID: ${selectedQuote.jobberQuoteId})` : ''}`
-                    : selectedQuote.jobberSyncStatus === 'failed'
-                      ? `Failed${selectedQuote.jobberLastError ? `: ${selectedQuote.jobberLastError}` : ''}`
-                      : selectedQuote.status === 'approved'
-                        ? 'Pending'
-                        : 'N/A'}
-                </p>
-                {selectedQuote.jobberSyncStatus === 'failed' &&
-                String(selectedQuote.jobberLastError ?? '').toLowerCase().includes('property') ? (
-                  <p className="mt-1 text-xs text-amber-700">
-                    Client exists in Jobber, but property resolution failed. Open that client in Jobber and confirm at least one property/service address exists.
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Quote title</p>
+                  <p className="mt-1 text-lg font-semibold leading-tight text-zinc-900">
+                    {selectedQuote.title || 'Untitled quote'}
                   </p>
-                ) : null}
-                {selectedQuote.jobberSyncStatus === 'failed' &&
-                String(selectedQuote.jobberLastError ?? '').toLowerCase().includes('missing required fields for jobber sync') ? (
-                  <p className="mt-1 text-xs text-amber-700">
-                    Required client/address/quote fields are missing. Update the quote or contact data first, then retry Jobber sync.
+                  <p className="mt-2 break-words text-sm leading-relaxed text-zinc-600">
+                    {selectedQuote.quoteDescription || '-'}
                   </p>
-                ) : null}
-                {jobberReadinessByQuoteId[selectedQuote.id] &&
-                !jobberReadinessByQuoteId[selectedQuote.id].ready &&
-                Array.isArray(jobberReadinessByQuoteId[selectedQuote.id].missingFields) &&
-                jobberReadinessByQuoteId[selectedQuote.id].missingFields.length > 0 ? (
-                  <p className="mt-1 text-xs text-amber-700">
-                    Missing for Jobber: {jobberReadinessByQuoteId[selectedQuote.id].missingFields.join(', ')}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Status</p>
+                      <p className="mt-0.5 text-sm font-medium text-zinc-800">{selectedQuote.status}</p>
+                    </div>
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Price</p>
+                      <p className="mt-0.5 text-sm font-medium text-zinc-800">{formatMoneyFromCents(selectedQuote.amountCents)}</p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500">Created: {new Date(selectedQuote.createdAt).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Contact</p>
+                  <div className="mt-1 rounded-xl border border-zinc-200 bg-white px-3 py-3 shadow-sm">
+                    <p className="text-sm text-zinc-700"><span className="font-semibold">Name:</span> {selectedQuote.client || '-'}</p>
+                    <p className="text-sm text-zinc-700"><span className="font-semibold">Phone:</span> {selectedQuote.clientPhone || '-'}</p>
+                    <p className="text-sm text-zinc-700"><span className="font-semibold">Email:</span> {selectedQuote.clientEmail || '-'}</p>
+                    <p className="text-sm text-zinc-700"><span className="font-semibold">Address:</span> {selectedQuote.clientAddress || '-'}</p>
+                    {contactMissingFieldsFromReadiness(jobberReadinessByQuoteId[selectedQuote.id]).length > 0 ? (
+                      <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2">
+                        <p className="text-xs font-medium text-amber-800">
+                          Missing contact fields for Jobber: {contactMissingFieldsFromReadiness(jobberReadinessByQuoteId[selectedQuote.id]).join(', ')}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="mt-2 h-8 text-xs text-sky-600 hover:text-sky-700"
+                          onClick={() => handleEditContactForQuote(selectedQuote)}>
+                          Edit Contact
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Line items</p>
+                  <p className="text-xs text-zinc-400">
+                    {Array.isArray(selectedQuote.lineItems) ? selectedQuote.lineItems.length : 0} item(s)
                   </p>
-                ) : null}
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-zinc-800">Title</p>
-                <p className="text-sm text-zinc-700">{selectedQuote.title || '-'}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-zinc-800">Quote Description</p>
-                <p className="text-sm text-zinc-700">{selectedQuote.quoteDescription || '-'}</p>
-              </div>
-              <div>
-                <p className="mb-1 text-sm font-semibold text-zinc-800">Line Items</p>
+                </div>
                 {Array.isArray(selectedQuote.lineItems) && selectedQuote.lineItems.length > 0 ? (
-                  <div className="overflow-hidden rounded-md border border-zinc-200">
+                  <div className="overflow-hidden rounded-xl border border-zinc-200 shadow-sm">
                     <table className="min-w-full divide-y divide-zinc-200">
                       <thead className="bg-zinc-50">
                         <tr>
@@ -531,21 +566,7 @@ function QuotesPage() {
                   <p className="text-sm text-zinc-500">No line items found.</p>
                 )}
               </div>
-              <div className="flex gap-2 pt-1">
-                <Button type="button" onClick={() => handleContinueDraft(selectedQuote)}>
-                  {selectedQuote.status === 'draft'
-                    ? 'Continue This Draft in AI Assistant'
-                    : 'Edit Again in AI Assistant'}
-                </Button>
-                {selectedQuote.status === 'approved' && selectedQuote.jobberSyncStatus !== 'synced' ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => handleRetryJobberSync(selectedQuote.id)}
-                    disabled={isRetryingJobberQuoteId === selectedQuote.id}>
-                    {isRetryingJobberQuoteId === selectedQuote.id ? 'Retrying Jobber Sync...' : 'Retry Jobber Sync'}
-                  </Button>
-                ) : null}
+              <div className="flex items-center justify-between gap-2 pt-1">
                 <Button
                   type="button"
                   variant="outline"
@@ -553,10 +574,42 @@ function QuotesPage() {
                   disabled={isDeletingQuoteId === selectedQuote.id}>
                   {isDeletingQuoteId === selectedQuote.id
                     ? 'Deleting...'
-                    : selectedQuote.status === 'approved'
-                      ? 'Delete Approved Quote'
-                      : 'Delete Draft'}
+                    : 'Delete Quote'}
                 </Button>
+                <div className="ml-auto flex items-center gap-2">
+                  {(() => {
+                    const readiness = jobberReadinessByQuoteId[selectedQuote.id]
+                    const missingFields = normalizeMissingFields(readiness)
+                    const isSynced = selectedQuote.jobberSyncStatus === 'synced'
+                    const isReady = readiness?.ready === true
+                    const isBusy = isRetryingJobberQuoteId === selectedQuote.id
+                    const isDisabled = isSynced || !isReady || isBusy
+                    const disabledReason = isSynced
+                      ? 'Already sent to Jobber'
+                      : !isReady && missingFields.length > 0
+                        ? `Missing required fields: ${missingFields.join(', ')}`
+                        : !isReady
+                          ? 'Quote is not ready for Jobber sync'
+                          : ''
+                    return (
+                      <span title={isDisabled ? disabledReason : 'Send to Jobber'}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleRetryJobberSync(selectedQuote.id)}
+                          disabled={isDisabled}
+                          aria-label={isDisabled ? `Send to Jobber disabled: ${disabledReason}` : 'Send to Jobber'}>
+                          {isBusy ? 'Sending to Jobber...' : 'Send to Jobber'}
+                        </Button>
+                      </span>
+                    )
+                  })()}
+                  <Button type="button" onClick={() => handleContinueDraft(selectedQuote)}>
+                    {selectedQuote.status === 'draft'
+                      ? 'Continue in AI'
+                      : 'Edit in AI'}
+                  </Button>
+                </div>
               </div>
             </div>
           ) : null}
