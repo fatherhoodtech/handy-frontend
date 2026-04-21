@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { apiRequest } from '@/lib/apiClient'
 import { cn } from '@/lib/utils'
 import { Search, TrendingUp, Users, UserPlus } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 const AVATAR_COLORS = [
   'bg-blue-100 text-blue-700',
@@ -38,6 +40,8 @@ function sourceBadge(source) {
 }
 
 function ContactsPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [contacts, setContacts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -56,6 +60,9 @@ function ContactsPage() {
     addressLine1: '', addressLine2: '',
     city: '', state: 'AL', postalCode: '',
   })
+  const [didAutoOpenEdit, setDidAutoOpenEdit] = useState(false)
+  const [pendingAutoEditContact, setPendingAutoEditContact] = useState(null)
+  const [requiredContactFieldKeys, setRequiredContactFieldKeys] = useState([])
 
   const sortedContacts = useMemo(
     () => [...contacts].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
@@ -108,6 +115,68 @@ function ContactsPage() {
     void loadContacts()
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    if (didAutoOpenEdit) return
+    const state = location.state
+    if (!state || state.openContactEdit !== true) return
+    if (!Array.isArray(contacts) || contacts.length === 0) return
+
+    const hint = state.contactHint || {}
+    const missingContactFields = Array.isArray(state.missingContactFields) ? state.missingContactFields : []
+    setRequiredContactFieldKeys(
+      missingContactFields
+        .map((field) => String(field || '').trim().toLowerCase())
+        .map((field) => {
+          if (field === 'client.fullname') return 'fullName'
+          if (field === 'client.phoneoremail') return 'phoneOrEmail'
+          if (field === 'client.address.street1') return 'addressLine1'
+          if (field === 'client.address.city') return 'city'
+          if (field === 'client.address.state') return 'state'
+          if (field === 'client.address.zip') return 'postalCode'
+          return ''
+        })
+        .filter(Boolean)
+    )
+    const contactId = String(hint.id || '').trim()
+    const email = String(hint.email || '').trim().toLowerCase()
+    const phone = String(hint.phone || '').replace(/\D+/g, '')
+    const name = String(hint.name || '').trim().toLowerCase()
+
+    const matchById = contactId
+      ? contacts.find((c) => String(c.id || '').trim() === contactId)
+      : null
+    const matchByEmail = !matchById && email
+      ? contacts.find((c) => String(c.email || '').trim().toLowerCase() === email)
+      : null
+    const matchByPhone = !matchById && !matchByEmail && phone
+      ? contacts.find((c) => String(c.phone || '').replace(/\D+/g, '') === phone)
+      : null
+    const matchByName = !matchById && !matchByEmail && !matchByPhone && name
+      ? contacts.find((c) => String(c.name || '').trim().toLowerCase() === name)
+      : null
+    const selected = matchById || matchByEmail || matchByPhone || matchByName
+
+    if (selected) {
+      // Defer opening until after Contacts page has painted with loaded data.
+      setPendingAutoEditContact(selected)
+    } else {
+      // Never leave the page filtered to an empty list on failed auto-match.
+      setSearch('')
+    }
+    setDidAutoOpenEdit(true)
+    navigate('/dashboard/contacts', { replace: true })
+  }, [contacts, didAutoOpenEdit, location.state, navigate])
+
+  useEffect(() => {
+    if (!pendingAutoEditContact) return
+    const timer = window.setTimeout(() => {
+      handleContactClick(pendingAutoEditContact)
+      openUpdateModal(pendingAutoEditContact)
+      setPendingAutoEditContact(null)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [pendingAutoEditContact])
 
   function handleContactClick(contact) {
     setSelectedContactName(contact.name)
@@ -220,6 +289,14 @@ function ContactsPage() {
     const name = (contact?.name || '').trim()
     if (name) return name
     return contact?.email || contact?.phone || 'this contact'
+  }
+
+  function isRequiredField(key) {
+    return requiredContactFieldKeys.includes(key)
+  }
+
+  function requiredInputClass(key) {
+    return isRequiredField(key) ? 'border-red-400 focus:border-red-500 focus-visible:ring-red-500/40' : ''
   }
 
   const hasActiveFilters = search.trim() || sourceFilter !== 'all' || dateFilter !== 'all'
@@ -518,7 +595,7 @@ function ContactsPage() {
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="update-firstName">First Name</Label>
-                  <Input id="update-firstName" name="firstName" value={updateFormData.firstName} onChange={handleUpdateInputChange} required />
+                  <Input id="update-firstName" name="firstName" value={updateFormData.firstName} onChange={handleUpdateInputChange} className={requiredInputClass('fullName')} required />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="update-middleName">Middle Name</Label>
@@ -526,22 +603,22 @@ function ContactsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="update-lastName">Last Name</Label>
-                  <Input id="update-lastName" name="lastName" value={updateFormData.lastName} onChange={handleUpdateInputChange} required />
+                  <Input id="update-lastName" name="lastName" value={updateFormData.lastName} onChange={handleUpdateInputChange} className={requiredInputClass('fullName')} required />
                 </div>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="update-email">Email</Label>
-                  <Input id="update-email" name="email" type="email" value={updateFormData.email} onChange={handleUpdateInputChange} />
+                  <Input id="update-email" name="email" type="email" value={updateFormData.email} onChange={handleUpdateInputChange} className={requiredInputClass('phoneOrEmail')} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="update-phone">Phone</Label>
-                  <Input id="update-phone" name="phone" value={updateFormData.phone} onChange={handleUpdateInputChange} />
+                  <Input id="update-phone" name="phone" value={updateFormData.phone} onChange={handleUpdateInputChange} className={requiredInputClass('phoneOrEmail')} />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="update-addressLine1">Address Line 1</Label>
-                <Input id="update-addressLine1" name="addressLine1" value={updateFormData.addressLine1} onChange={handleUpdateInputChange} />
+                <Input id="update-addressLine1" name="addressLine1" value={updateFormData.addressLine1} onChange={handleUpdateInputChange} className={requiredInputClass('addressLine1')} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="update-addressLine2">Address Line 2</Label>
@@ -550,17 +627,22 @@ function ContactsPage() {
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="update-city">City</Label>
-                  <Input id="update-city" name="city" value={updateFormData.city} onChange={handleUpdateInputChange} />
+                  <Input id="update-city" name="city" value={updateFormData.city} onChange={handleUpdateInputChange} className={requiredInputClass('city')} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="update-state">State</Label>
-                  <Input id="update-state" name="state" maxLength={2} value={updateFormData.state} onChange={handleUpdateInputChange} />
+                  <Input id="update-state" name="state" maxLength={2} value={updateFormData.state} onChange={handleUpdateInputChange} className={requiredInputClass('state')} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="update-postalCode">ZIP Code</Label>
-                  <Input id="update-postalCode" name="postalCode" value={updateFormData.postalCode} onChange={handleUpdateInputChange} />
+                  <Input id="update-postalCode" name="postalCode" value={updateFormData.postalCode} onChange={handleUpdateInputChange} className={requiredInputClass('postalCode')} />
                 </div>
               </div>
+              {requiredContactFieldKeys.length > 0 ? (
+                <p className="text-xs text-red-600">
+                  Red bordered fields are required for Jobber sync.
+                </p>
+              ) : null}
               <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="outline" onClick={closeUpdateModal} disabled={isSubmitting}>Cancel</Button>
                 <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Changes'}</Button>

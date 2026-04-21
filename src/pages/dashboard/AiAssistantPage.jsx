@@ -1331,6 +1331,10 @@ function AiAssistantPage() {
       const syncStatus = String(response?.jobberSync?.status ?? '')
       const syncError = String(response?.jobberSync?.error ?? '')
       const jobberQuoteId = String(response?.jobberSync?.jobberQuoteId ?? '')
+      const reasonCategory = String(response?.jobberSync?.reasonCategory ?? '')
+      const missingFields = Array.isArray(response?.jobberSync?.missingFields)
+        ? response.jobberSync.missingFields
+        : []
       const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
       setMessages(normalizeMessages(resetResponse?.messages))
       if (resetResponse?.quoteDraft) setQuoteDraft(recalcDraft(resetResponse.quoteDraft))
@@ -1346,7 +1350,9 @@ function AiAssistantPage() {
         syncStatus === 'synced'
           ? `Quote approved (${quoteId.slice(0, 8)}) and synced to Jobber${jobberQuoteId ? ` (${jobberQuoteId.slice(0, 10)})` : ''}. Started a new blank draft.`
           : syncStatus === 'failed'
-            ? `Quote approved locally (${quoteId.slice(0, 8)}), but Jobber sync failed${syncError ? `: ${syncError}` : '.'} Started a new blank draft.`
+            ? reasonCategory === 'preflight_validation_failed' && missingFields.length > 0
+              ? `Quote approved locally (${quoteId.slice(0, 8)}), but Jobber sync failed due to missing fields: ${missingFields.join(', ')}. Started a new blank draft.`
+              : `Quote approved locally (${quoteId.slice(0, 8)}), but Jobber sync failed${syncError ? `: ${syncError}` : '.'} Started a new blank draft.`
             : quoteId
               ? `Quote approved and saved (${quoteId.slice(0, 8)}). Started a new blank draft.`
               : 'Quote approved and saved. Started a new blank draft.'
