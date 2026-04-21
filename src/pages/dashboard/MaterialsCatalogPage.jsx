@@ -24,12 +24,13 @@ export default function MaterialsCatalogPage() {
   const [materialsSearch, setMaterialsSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [uomFilter, setUomFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('name-asc')
   const [showCreate, setShowCreate] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
 
   const filteredCatalog = useMemo(() => {
     const q = materialsSearch.trim().toLowerCase()
-    return catalogItems.filter((item) => {
+    const filtered = catalogItems.filter((item) => {
       const matchesSearch = q.length === 0 || `${item.materials || ''} ${item.uom || ''}`.toLowerCase().includes(q)
       const matchesStatus =
         statusFilter === 'all' ||
@@ -38,7 +39,18 @@ export default function MaterialsCatalogPage() {
       const matchesUom = uomFilter === 'all' || String(item.uom || '').toLowerCase() === uomFilter
       return matchesSearch && matchesStatus && matchesUom
     })
-  }, [catalogItems, materialsSearch, statusFilter, uomFilter])
+    const sorted = [...filtered]
+    sorted.sort((a, b) => {
+      if (sortBy === 'name-asc') return String(a.materials || '').localeCompare(String(b.materials || ''))
+      if (sortBy === 'name-desc') return String(b.materials || '').localeCompare(String(a.materials || ''))
+      if (sortBy === 'price-asc') return Number(a.price_cents || 0) - Number(b.price_cents || 0)
+      if (sortBy === 'price-desc') return Number(b.price_cents || 0) - Number(a.price_cents || 0)
+      if (sortBy === 'uom-asc') return String(a.uom || '').localeCompare(String(b.uom || ''))
+      if (sortBy === 'uom-desc') return String(b.uom || '').localeCompare(String(a.uom || ''))
+      return 0
+    })
+    return sorted
+  }, [catalogItems, materialsSearch, statusFilter, uomFilter, sortBy])
 
   const uomOptions = useMemo(() => {
     const set = new Set(catalogItems.map((i) => String(i.uom || '').trim().toLowerCase()).filter(Boolean))
@@ -149,10 +161,8 @@ export default function MaterialsCatalogPage() {
         <p className="text-sm text-zinc-500">Loading materials catalog...</p>
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <Button type="button" onClick={() => setShowCreate((v) => !v)}>
-              {showCreate ? 'Close create' : 'Create material'}
-            </Button>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <div className="relative min-w-[220px] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
               <Input
@@ -179,27 +189,22 @@ export default function MaterialsCatalogPage() {
                 <option key={uom} value={uom}>{uom}</option>
               ))}
             </select>
-          </div>
-          {showCreate ? (
-            <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4 sm:grid-cols-4">
-              <Input
-                placeholder="Material name"
-                value={catalogForm.materials}
-                onChange={(e) => setCatalogForm((c) => ({ ...c, materials: e.target.value }))}
-              />
-              <Input
-                placeholder="UOM (each, ft, hr)"
-                value={catalogForm.uom}
-                onChange={(e) => setCatalogForm((c) => ({ ...c, uom: e.target.value }))}
-              />
-              <Input
-                placeholder="Price ($)"
-                value={catalogForm.priceDollars}
-                onChange={(e) => setCatalogForm((c) => ({ ...c, priceDollars: e.target.value }))}
-              />
-              <Button type="button" onClick={createCatalogRow}>Create</Button>
+            <select
+              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}>
+              <option value="name-asc">Sort: Name A-Z</option>
+              <option value="name-desc">Sort: Name Z-A</option>
+              <option value="price-asc">Sort: Price Low-High</option>
+              <option value="price-desc">Sort: Price High-Low</option>
+              <option value="uom-asc">Sort: UOM A-Z</option>
+              <option value="uom-desc">Sort: UOM Z-A</option>
+            </select>
             </div>
-          ) : null}
+            <Button type="button" className="bg-zinc-900 text-white hover:bg-zinc-800" onClick={() => setShowCreate(true)}>
+              Create material
+            </Button>
+          </div>
           <div className="overflow-hidden rounded-xl border border-zinc-200">
             <table className="min-w-full">
               <thead className="border-b border-zinc-200 bg-white">
@@ -288,6 +293,41 @@ export default function MaterialsCatalogPage() {
               <div className="flex gap-2">
                 <Button type="button" onClick={updateCatalogItem}>Save</Button>
                 <Button type="button" variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
+              </div>
+            </div>
+          ) : null}
+          {showCreate ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setShowCreate(false)}>
+              <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-semibold text-zinc-900">Create material</h3>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <Input
+                    placeholder="Material name"
+                    value={catalogForm.materials}
+                    onChange={(e) => setCatalogForm((c) => ({ ...c, materials: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="UOM (each, ft, hr)"
+                    value={catalogForm.uom}
+                    onChange={(e) => setCatalogForm((c) => ({ ...c, uom: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Price ($)"
+                    value={catalogForm.priceDollars}
+                    onChange={(e) => setCatalogForm((c) => ({ ...c, priceDollars: e.target.value }))}
+                  />
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+                  <Button
+                    type="button"
+                    onClick={async () => {
+                      await createCatalogRow()
+                      setShowCreate(false)
+                    }}>
+                    Create
+                  </Button>
+                </div>
               </div>
             </div>
           ) : null}
