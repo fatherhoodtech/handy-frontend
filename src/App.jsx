@@ -6,6 +6,8 @@ import ContactsPage from '@/pages/dashboard/ContactsPage'
 import OverviewPage from '@/pages/dashboard/OverviewPage'
 import RequestsPage from '@/pages/dashboard/RequestsPage'
 import QuotesPage from '@/pages/dashboard/QuotesPage'
+import LaborPricingPage from '@/pages/dashboard/LaborPricingPage'
+import MaterialsCatalogPage from '@/pages/dashboard/MaterialsCatalogPage'
 import SettingsPage from '@/pages/dashboard/SettingsPage'
 import SignInPage from '@/pages/SignInPage'
 
@@ -27,6 +29,8 @@ function App() {
         <Route path="ai-assistant" element={<AiAssistantPage />} />
         <Route path="contacts" element={<ContactsPage />} />
         <Route path="quotes" element={<QuotesPage />} />
+        <Route path="labor-pricing" element={<LaborPricingPage />} />
+        <Route path="materials-catalog" element={<MaterialsCatalogPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

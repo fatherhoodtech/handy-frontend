@@ -112,6 +112,24 @@ function RequestsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
+  const [showManualForm, setShowManualForm] = useState(false)
+  const [salespeople, setSalespeople] = useState([])
+  const [clientOptions, setClientOptions] = useState([])
+  const [clientSearch, setClientSearch] = useState('')
+  const [isSavingManual, setIsSavingManual] = useState(false)
+  const [manualForm, setManualForm] = useState({
+    id: '',
+    title: '',
+    label: '',
+    leadId: '',
+    requestedOn: '',
+    salesUserId: '',
+    jobDescription: '',
+    availabilityDate1: '',
+    availabilityDate2: '',
+    preferredArrivalTimes: [],
+    images: [],
+  })
 
   const loadRequests = useCallback(async () => {
     const result = await apiRequest('/api/sales/requests')
@@ -133,6 +151,25 @@ function RequestsPage() {
     void load()
     return () => { cancelled = true }
   }, [loadRequests])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadManualFormOptions() {
+      try {
+        const [assigneesRes, clientsRes] = await Promise.all([
+          apiRequest('/api/sales/requests/assignees'),
+          apiRequest('/api/sales/ai-assistant/clients?limit=100'),
+        ])
+        if (cancelled) return
+        setSalespeople(Array.isArray(assigneesRes?.salespeople) ? assigneesRes.salespeople : [])
+        setClientOptions(Array.isArray(clientsRes?.clients) ? clientsRes.clients : [])
+      } catch {
+        // Keep forms usable even if options fail to load.
+      }
+    }
+    void loadManualFormOptions()
+    return () => { cancelled = true }
+  }, [])
 
   const sorted = useMemo(
     () => [...requests].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
@@ -207,11 +244,116 @@ function RequestsPage() {
     }
   }
 
+  function openManualCreateForm() {
+    setManualForm({
+      id: '',
+      title: '',
+      label: '',
+      leadId: '',
+      requestedOn: new Date().toISOString().slice(0, 10),
+      salesUserId: '',
+      jobDescription: '',
+      availabilityDate1: '',
+      availabilityDate2: '',
+      preferredArrivalTimes: [],
+      images: [],
+    })
+    setClientSearch('')
+    setShowManualForm(true)
+    setSelected(null)
+  }
+
+  function openManualEditForm(item) {
+    setManualForm({
+      id: String(item.id ?? ''),
+      title: String(item.title ?? ''),
+      label: String(item.label ?? ''),
+      leadId: String(item.leadId ?? ''),
+      requestedOn: String(item.requestedOn ?? '').slice(0, 10),
+      salesUserId: String(item.salesperson?.id ?? ''),
+      jobDescription: String(item.notes ?? ''),
+      availabilityDate1: String(item.availabilityDate1 ?? '').slice(0, 10),
+      availabilityDate2: String(item.availabilityDate2 ?? '').slice(0, 10),
+      preferredArrivalTimes: Array.isArray(item.preferredArrivalTimes) ? item.preferredArrivalTimes : [],
+      images: Array.isArray(item.images) ? item.images : [],
+    })
+    setClientSearch(String(item.name ?? ''))
+    setShowManualForm(true)
+  }
+
+  function toggleArrivalTime(value) {
+    setManualForm((prev) => {
+      const has = prev.preferredArrivalTimes.includes(value)
+      return {
+        ...prev,
+        preferredArrivalTimes: has
+          ? prev.preferredArrivalTimes.filter((v) => v !== value)
+          : [...prev.preferredArrivalTimes, value],
+      }
+    })
+  }
+
+  async function handleImageUpload(event) {
+    const files = Array.from(event.target.files ?? [])
+    if (!files.length) return
+    const next = await Promise.all(
+      files.map((file) => new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve({ name: file.name, dataUrl: String(reader.result ?? '') })
+        reader.readAsDataURL(file)
+      }))
+    )
+    setManualForm((prev) => ({ ...prev, images: [...prev.images, ...next.filter((x) => x.dataUrl)] }))
+    event.target.value = ''
+  }
+
+  async function handleSaveManualRequest() {
+    if (!manualForm.title.trim() || !manualForm.jobDescription.trim() || !manualForm.salesUserId) {
+      setErrorMessage('Title, salesperson, and job description are required for manual requests.')
+      return
+    }
+    setIsSavingManual(true)
+    try {
+      const payload = {
+        title: manualForm.title.trim(),
+        label: manualForm.label.trim(),
+        leadId: manualForm.leadId || undefined,
+        requestedOn: manualForm.requestedOn || undefined,
+        salesUserId: Number(manualForm.salesUserId),
+        jobDescription: manualForm.jobDescription.trim(),
+        availabilityDate1: manualForm.availabilityDate1 || undefined,
+        availabilityDate2: manualForm.availabilityDate2 || undefined,
+        preferredArrivalTimes: manualForm.preferredArrivalTimes,
+        images: manualForm.images,
+      }
+      if (manualForm.id) {
+        await apiRequest(`/api/sales/requests/manual/${encodeURIComponent(manualForm.id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        })
+      } else {
+        await apiRequest('/api/sales/requests/manual', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+      }
+      await loadRequests()
+      setShowManualForm(false)
+      setErrorMessage('')
+    } catch (error) {
+      setErrorMessage(error?.message || 'Failed to save manual request')
+    } finally {
+      setIsSavingManual(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Page header */}
       <div className="flex items-center justify-between">
-        {/* <h1 className="text-2xl font-bold text-zinc-900">Requests</h1> */}
+        <Button type="button" className="bg-zinc-900 text-white hover:bg-zinc-800" onClick={openManualCreateForm}>
+          Create request
+        </Button>
       </div>
 
       {/* Overview stat cards */}
@@ -629,6 +771,88 @@ function RequestsPage() {
                 className="w-full bg-sky-500 text-white hover:bg-sky-600"
                 onClick={() => handleContinueWithAI(selected)}>
                 Continue with AI
+              </Button>
+              {selected?.source === 'manual' ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2 w-full"
+                  onClick={() => openManualEditForm(selected)}>
+                  Edit request
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showManualForm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setShowManualForm(false)}>
+          <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-zinc-900">{manualForm.id ? 'Update request' : 'Create request'}</h3>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Input placeholder="Title" value={manualForm.title} onChange={(e) => setManualForm((p) => ({ ...p, title: e.target.value }))} />
+              <Input placeholder="Label" value={manualForm.label} onChange={(e) => setManualForm((p) => ({ ...p, label: e.target.value }))} />
+              <div className="sm:col-span-2">
+                <Input placeholder="Search client..." value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} />
+                <select
+                  className="mt-2 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                  value={manualForm.leadId}
+                  onChange={(e) => setManualForm((p) => ({ ...p, leadId: e.target.value }))}>
+                  <option value="">Select client in system</option>
+                  {clientOptions
+                    .filter((c) => `${c.name || ''} ${c.subtitle || ''}`.toLowerCase().includes(clientSearch.toLowerCase()))
+                    .slice(0, 30)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}{c.subtitle ? ` (${c.subtitle})` : ''}</option>
+                    ))}
+                </select>
+              </div>
+              <Input type="date" value={manualForm.requestedOn} onChange={(e) => setManualForm((p) => ({ ...p, requestedOn: e.target.value }))} />
+              <select
+                className="rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                value={manualForm.salesUserId}
+                onChange={(e) => setManualForm((p) => ({ ...p, salesUserId: e.target.value }))}>
+                <option value="">Assign salesperson</option>
+                {salespeople.map((sp) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+              </select>
+              <textarea
+                className="min-h-28 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm sm:col-span-2"
+                placeholder="Job description"
+                value={manualForm.jobDescription}
+                onChange={(e) => setManualForm((p) => ({ ...p, jobDescription: e.target.value }))}
+              />
+              <Input type="date" value={manualForm.availabilityDate1} onChange={(e) => setManualForm((p) => ({ ...p, availabilityDate1: e.target.value }))} />
+              <Input type="date" value={manualForm.availabilityDate2} onChange={(e) => setManualForm((p) => ({ ...p, availabilityDate2: e.target.value }))} />
+              <div className="sm:col-span-2">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Preferred arrival times</p>
+                <div className="flex flex-wrap gap-2">
+                  {['anytime', 'morning', 'afternoon', 'evening'].map((slot) => (
+                    <label key={slot} className="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-2 py-1 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={manualForm.preferredArrivalTimes.includes(slot)}
+                        onChange={() => toggleArrivalTime(slot)}
+                      />
+                      {slot[0].toUpperCase() + slot.slice(1)}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Upload images</p>
+                <Input type="file" accept="image/*" multiple onChange={handleImageUpload} />
+                {manualForm.images.length ? (
+                  <ul className="mt-2 space-y-1 text-xs text-zinc-600">
+                    {manualForm.images.map((img, idx) => <li key={`${img.name}-${idx}`}>{img.name}</li>)}
+                  </ul>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowManualForm(false)}>Cancel</Button>
+              <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" disabled={isSavingManual} onClick={handleSaveManualRequest}>
+                {isSavingManual ? 'Saving...' : manualForm.id ? 'Update request' : 'Create request'}
               </Button>
             </div>
           </div>

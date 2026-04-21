@@ -5,8 +5,10 @@ import {
   LayoutDashboard,
   ListFilter,
   Mail,
+  Package,
   Settings,
   Trash2,
+  Wrench,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -125,6 +127,8 @@ function DashboardPage() {
     { to: '/dashboard/contacts', label: 'Contacts', icon: Mail },
     { to: '/dashboard/requests', label: 'Requests', icon: ListFilter },
     { to: '/dashboard/quotes', label: 'Quotes', icon: ClipboardList },
+    { to: '/dashboard/labor-pricing', label: 'Labor Pricing', icon: Wrench },
+    { to: '/dashboard/materials-catalog', label: 'Materials Catalog', icon: Package },
     { to: '/dashboard/settings', label: 'Settings', icon: Settings },
   ]
   const allRouteLabels = [
