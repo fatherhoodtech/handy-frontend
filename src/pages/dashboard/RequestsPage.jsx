@@ -821,7 +821,8 @@ function RequestsPage() {
             </div>
           </div>
         </div>
-      ) : null}
+      ), document.body)
+        : null}
 
       {showManualForm ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setShowManualForm(false)}>
@@ -894,8 +895,7 @@ function RequestsPage() {
             </div>
           </div>
         </div>
-        ), document.body)
-        : null}
+        ) : null}
     </div>
   )
 }
