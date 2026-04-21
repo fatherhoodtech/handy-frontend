@@ -141,6 +141,16 @@ export default function LaborPricingPage() {
     }
   }
 
+  function openUpdateModal(row) {
+    setEditingRow({
+      id: row.id,
+      trade: row.trade,
+      expertiseLevel: row.expertiseLevel,
+      hourlyRateDollars: centsToDollars(row.hourlyRateCents),
+      active: row.active,
+    })
+  }
+
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-6">
       {error && (
@@ -239,23 +249,11 @@ export default function LaborPricingPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <div className="inline-flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            setEditingRow({
-                              id: row.id,
-                              trade: row.trade,
-                              expertiseLevel: row.expertiseLevel,
-                              hourlyRateDollars: centsToDollars(row.hourlyRateCents),
-                              active: row.active,
-                            })
-                          }>
+                      <div className="inline-flex min-w-[190px] justify-end gap-2">
+                        <Button type="button" variant="outline" size="sm" className="w-24" onClick={() => openUpdateModal(row)}>
                           Update
                         </Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => toggleLaborActive(row)}>
+                        <Button type="button" variant="outline" size="sm" className="w-24" onClick={() => toggleLaborActive(row)}>
                           {row.active ? 'Deactivate' : 'Activate'}
                         </Button>
                       </div>
@@ -265,38 +263,6 @@ export default function LaborPricingPage() {
               </tbody>
             </table>
           </div>
-          {editingRow ? (
-            <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4 sm:grid-cols-5">
-              <Input
-                placeholder="Trade"
-                value={editingRow.trade}
-                onChange={(e) => setEditingRow((p) => ({ ...p, trade: e.target.value }))}
-              />
-              <select
-                className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
-                value={editingRow.expertiseLevel}
-                onChange={(e) => setEditingRow((p) => ({ ...p, expertiseLevel: e.target.value }))}>
-                <option value="standard">Standard</option>
-                <option value="expert">Expert</option>
-              </select>
-              <Input
-                placeholder="Hourly rate ($)"
-                value={editingRow.hourlyRateDollars}
-                onChange={(e) => setEditingRow((p) => ({ ...p, hourlyRateDollars: e.target.value }))}
-              />
-              <select
-                className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
-                value={editingRow.active ? 'active' : 'inactive'}
-                onChange={(e) => setEditingRow((p) => ({ ...p, active: e.target.value === 'active' }))}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              <div className="flex gap-2">
-                <Button type="button" onClick={updateLaborRow}>Save</Button>
-                <Button type="button" variant="outline" onClick={() => setEditingRow(null)}>Cancel</Button>
-              </div>
-            </div>
-          ) : null}
           {showCreate ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setShowCreate(false)}>
               <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -329,6 +295,49 @@ export default function LaborPricingPage() {
                       setShowCreate(false)
                     }}>
                     Create
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {editingRow ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setEditingRow(null)}>
+              <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-semibold text-zinc-900">Update labor rate</h3>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
+                  <Input
+                    placeholder="Trade"
+                    value={editingRow.trade}
+                    onChange={(e) => setEditingRow((p) => ({ ...p, trade: e.target.value }))}
+                  />
+                  <select
+                    className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
+                    value={editingRow.expertiseLevel}
+                    onChange={(e) => setEditingRow((p) => ({ ...p, expertiseLevel: e.target.value }))}>
+                    <option value="standard">Standard</option>
+                    <option value="expert">Expert</option>
+                  </select>
+                  <Input
+                    placeholder="Hourly rate ($)"
+                    value={editingRow.hourlyRateDollars}
+                    onChange={(e) => setEditingRow((p) => ({ ...p, hourlyRateDollars: e.target.value }))}
+                  />
+                  <select
+                    className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
+                    value={editingRow.active ? 'active' : 'inactive'}
+                    onChange={(e) => setEditingRow((p) => ({ ...p, active: e.target.value === 'active' }))}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setEditingRow(null)}>Cancel</Button>
+                  <Button
+                    type="button"
+                    onClick={async () => {
+                      await updateLaborRow()
+                    }}>
+                    Save
                   </Button>
                 </div>
               </div>

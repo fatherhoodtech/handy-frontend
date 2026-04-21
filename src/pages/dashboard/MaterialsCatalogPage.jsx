@@ -139,6 +139,16 @@ export default function MaterialsCatalogPage() {
     }
   }
 
+  function openUpdateModal(item) {
+    setEditingItem({
+      id: item.id,
+      materials: item.materials,
+      uom: item.uom,
+      priceDollars: centsToDollars(item.price_cents),
+      active: item.active,
+    })
+  }
+
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-6">
       {error && (
@@ -240,23 +250,11 @@ export default function MaterialsCatalogPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <div className="inline-flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            setEditingItem({
-                              id: item.id,
-                              materials: item.materials,
-                              uom: item.uom,
-                              priceDollars: centsToDollars(item.price_cents),
-                              active: item.active,
-                            })
-                          }>
+                      <div className="inline-flex min-w-[190px] justify-end gap-2">
+                        <Button type="button" variant="outline" size="sm" className="w-24" onClick={() => openUpdateModal(item)}>
                           Update
                         </Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => toggleCatalogActive(item)}>
+                        <Button type="button" variant="outline" size="sm" className="w-24" onClick={() => toggleCatalogActive(item)}>
                           {item.active ? 'Deactivate' : 'Activate'}
                         </Button>
                       </div>
@@ -266,36 +264,6 @@ export default function MaterialsCatalogPage() {
               </tbody>
             </table>
           </div>
-          {editingItem ? (
-            <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4 sm:grid-cols-5">
-              <Input
-                placeholder="Material name"
-                value={editingItem.materials}
-                onChange={(e) => setEditingItem((p) => ({ ...p, materials: e.target.value }))}
-              />
-              <Input
-                placeholder="UOM"
-                value={editingItem.uom}
-                onChange={(e) => setEditingItem((p) => ({ ...p, uom: e.target.value }))}
-              />
-              <Input
-                placeholder="Price ($)"
-                value={editingItem.priceDollars}
-                onChange={(e) => setEditingItem((p) => ({ ...p, priceDollars: e.target.value }))}
-              />
-              <select
-                className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
-                value={editingItem.active ? 'active' : 'inactive'}
-                onChange={(e) => setEditingItem((p) => ({ ...p, active: e.target.value === 'active' }))}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              <div className="flex gap-2">
-                <Button type="button" onClick={updateCatalogItem}>Save</Button>
-                <Button type="button" variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
-              </div>
-            </div>
-          ) : null}
           {showCreate ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setShowCreate(false)}>
               <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -326,6 +294,47 @@ export default function MaterialsCatalogPage() {
                       setShowCreate(false)
                     }}>
                     Create
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {editingItem ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setEditingItem(null)}>
+              <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-semibold text-zinc-900">Update material</h3>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
+                  <Input
+                    placeholder="Material name"
+                    value={editingItem.materials}
+                    onChange={(e) => setEditingItem((p) => ({ ...p, materials: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="UOM"
+                    value={editingItem.uom}
+                    onChange={(e) => setEditingItem((p) => ({ ...p, uom: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Price ($)"
+                    value={editingItem.priceDollars}
+                    onChange={(e) => setEditingItem((p) => ({ ...p, priceDollars: e.target.value }))}
+                  />
+                  <select
+                    className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
+                    value={editingItem.active ? 'active' : 'inactive'}
+                    onChange={(e) => setEditingItem((p) => ({ ...p, active: e.target.value === 'active' }))}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
+                  <Button
+                    type="button"
+                    onClick={async () => {
+                      await updateCatalogItem()
+                    }}>
+                    Save
                   </Button>
                 </div>
               </div>
