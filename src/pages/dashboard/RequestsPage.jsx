@@ -98,7 +98,7 @@ function buildQuoteSeed(item) {
   if (item.notes?.trim()) parts.push(item.notes.trim())
   if (item.jobberWebUri?.trim()) parts.push(`Open in Jobber: ${item.jobberWebUri.trim()}`)
   return {
-    title: item.title?.trim() || 'Quote from Jobber request',
+    title: item.title?.trim() || 'Quote from request',
     quoteDescription: parts.join('\n\n'),
   }
 }
@@ -129,6 +129,7 @@ function RequestsPage() {
     availabilityDate2: '',
     preferredArrivalTimes: [],
     images: [],
+    internalNote: '',
   })
 
   const loadRequests = useCallback(async () => {
@@ -206,7 +207,7 @@ function RequestsPage() {
     const seed = buildQuoteSeed(item)
     const jobberRequestId = String(item.jobberRequestId ?? '').trim()
     if (!jobberRequestId) {
-      setErrorMessage('This request is missing Jobber request id, cannot continue with AI.')
+      setErrorMessage('This request is missing a request id, cannot continue with AI.')
       return
     }
     try {
@@ -257,6 +258,7 @@ function RequestsPage() {
       availabilityDate2: '',
       preferredArrivalTimes: [],
       images: [],
+      internalNote: '',
     })
     setClientSearch('')
     setShowManualForm(true)
@@ -276,6 +278,7 @@ function RequestsPage() {
       availabilityDate2: String(item.availabilityDate2 ?? '').slice(0, 10),
       preferredArrivalTimes: Array.isArray(item.preferredArrivalTimes) ? item.preferredArrivalTimes : [],
       images: Array.isArray(item.images) ? item.images : [],
+      internalNote: String(item.internalNote ?? ''),
     })
     setClientSearch(String(item.name ?? ''))
     setShowManualForm(true)
@@ -325,6 +328,7 @@ function RequestsPage() {
         availabilityDate2: manualForm.availabilityDate2 || undefined,
         preferredArrivalTimes: manualForm.preferredArrivalTimes,
         images: manualForm.images,
+        internalNote: manualForm.internalNote.trim(),
       }
       if (manualForm.id) {
         await apiRequest(`/api/sales/requests/manual/${encodeURIComponent(manualForm.id)}`, {
@@ -447,7 +451,7 @@ function RequestsPage() {
           <div className="px-4 py-8 text-center text-sm text-zinc-400">Loading requests…</div>
         ) : filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-zinc-400">
-            No requests found. Run <code className="rounded bg-zinc-100 px-1">npm run jobber:requests:latest10</code> to pull from Jobber.
+            No requests found.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -625,6 +629,15 @@ function RequestsPage() {
                   <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Assessment instructions</p>
                   <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5">
                     <p className="whitespace-pre-wrap text-zinc-800">{selected.assessmentInstructions}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              {selected.internalNote ? (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Internal note</p>
+                  <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5">
+                    <p className="whitespace-pre-wrap text-zinc-800">{selected.internalNote}</p>
                   </div>
                 </div>
               ) : null}
@@ -848,6 +861,12 @@ function RequestsPage() {
                   </ul>
                 ) : null}
               </div>
+              <textarea
+                className="min-h-24 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm sm:col-span-2"
+                placeholder="Internal note for yourself or a teammate (not customer-facing)"
+                value={manualForm.internalNote}
+                onChange={(e) => setManualForm((p) => ({ ...p, internalNote: e.target.value }))}
+              />
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowManualForm(false)}>Cancel</Button>
