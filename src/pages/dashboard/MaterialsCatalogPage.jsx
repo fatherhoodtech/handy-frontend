@@ -22,14 +22,28 @@ export default function MaterialsCatalogPage() {
   const [catalogItems, setCatalogItems] = useState([])
   const [catalogForm, setCatalogForm] = useState({ materials: '', uom: '', priceDollars: '' })
   const [materialsSearch, setMaterialsSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [uomFilter, setUomFilter] = useState('all')
+  const [showCreate, setShowCreate] = useState(false)
+  const [editingItem, setEditingItem] = useState(null)
 
   const filteredCatalog = useMemo(() => {
     const q = materialsSearch.trim().toLowerCase()
-    if (!q) return catalogItems
-    return catalogItems.filter((item) =>
-      `${item.materials || ''} ${item.uom || ''}`.toLowerCase().includes(q)
-    )
-  }, [catalogItems, materialsSearch])
+    return catalogItems.filter((item) => {
+      const matchesSearch = q.length === 0 || `${item.materials || ''} ${item.uom || ''}`.toLowerCase().includes(q)
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && item.active) ||
+        (statusFilter === 'inactive' && !item.active)
+      const matchesUom = uomFilter === 'all' || String(item.uom || '').toLowerCase() === uomFilter
+      return matchesSearch && matchesStatus && matchesUom
+    })
+  }, [catalogItems, materialsSearch, statusFilter, uomFilter])
+
+  const uomOptions = useMemo(() => {
+    const set = new Set(catalogItems.map((i) => String(i.uom || '').trim().toLowerCase()).filter(Boolean))
+    return Array.from(set).sort()
+  }, [catalogItems])
 
   function clearMessages() {
     setError('')
@@ -91,6 +105,28 @@ export default function MaterialsCatalogPage() {
     }
   }
 
+  async function updateCatalogItem() {
+    if (!editingItem) return
+    try {
+      clearMessages()
+      const response = await apiRequest(`/api/sales/settings/materials-catalog/${editingItem.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          materials: editingItem.materials,
+          uom: editingItem.uom,
+          price_cents: dollarsToCents(editingItem.priceDollars),
+          active: editingItem.active,
+        }),
+      })
+      const next = response?.item
+      if (next) setCatalogItems((current) => current.map((row) => (row.id === next.id ? next : row)))
+      setEditingItem(null)
+      setNotice('Catalog item updated.')
+    } catch (err) {
+      setError(err?.message || 'Failed to update catalog item')
+    }
+  }
+
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-6">
       {error && (
@@ -113,33 +149,57 @@ export default function MaterialsCatalogPage() {
         <p className="text-sm text-zinc-500">Loading materials catalog...</p>
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4 sm:grid-cols-4">
-            <Input
-              placeholder="Material name"
-              value={catalogForm.materials}
-              onChange={(e) => setCatalogForm((c) => ({ ...c, materials: e.target.value }))}
-            />
-            <Input
-              placeholder="UOM (each, ft, hr)"
-              value={catalogForm.uom}
-              onChange={(e) => setCatalogForm((c) => ({ ...c, uom: e.target.value }))}
-            />
-            <Input
-              placeholder="Price ($)"
-              value={catalogForm.priceDollars}
-              onChange={(e) => setCatalogForm((c) => ({ ...c, priceDollars: e.target.value }))}
-            />
-            <Button type="button" onClick={createCatalogRow}>Add Material</Button>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <Button type="button" onClick={() => setShowCreate((v) => !v)}>
+              {showCreate ? 'Close create' : 'Create material'}
+            </Button>
+            <div className="relative min-w-[220px] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+              <Input
+                value={materialsSearch}
+                onChange={(e) => setMaterialsSearch(e.target.value)}
+                placeholder="Smart search materials..."
+                className="pl-8"
+              />
+            </div>
+            <select
+              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">All status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <select
+              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
+              value={uomFilter}
+              onChange={(e) => setUomFilter(e.target.value)}>
+              <option value="all">All UOM</option>
+              {uomOptions.map((uom) => (
+                <option key={uom} value={uom}>{uom}</option>
+              ))}
+            </select>
           </div>
-          <div className="relative mb-4">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-            <Input
-              value={materialsSearch}
-              onChange={(e) => setMaterialsSearch(e.target.value)}
-              placeholder="Search materials..."
-              className="pl-8"
-            />
-          </div>
+          {showCreate ? (
+            <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4 sm:grid-cols-4">
+              <Input
+                placeholder="Material name"
+                value={catalogForm.materials}
+                onChange={(e) => setCatalogForm((c) => ({ ...c, materials: e.target.value }))}
+              />
+              <Input
+                placeholder="UOM (each, ft, hr)"
+                value={catalogForm.uom}
+                onChange={(e) => setCatalogForm((c) => ({ ...c, uom: e.target.value }))}
+              />
+              <Input
+                placeholder="Price ($)"
+                value={catalogForm.priceDollars}
+                onChange={(e) => setCatalogForm((c) => ({ ...c, priceDollars: e.target.value }))}
+              />
+              <Button type="button" onClick={createCatalogRow}>Create</Button>
+            </div>
+          ) : null}
           <div className="overflow-hidden rounded-xl border border-zinc-200">
             <table className="min-w-full">
               <thead className="border-b border-zinc-200 bg-white">
@@ -175,15 +235,62 @@ export default function MaterialsCatalogPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <Button type="button" variant="outline" size="sm" onClick={() => toggleCatalogActive(item)}>
-                        {item.active ? 'Deactivate' : 'Activate'}
-                      </Button>
+                      <div className="inline-flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setEditingItem({
+                              id: item.id,
+                              materials: item.materials,
+                              uom: item.uom,
+                              priceDollars: centsToDollars(item.price_cents),
+                              active: item.active,
+                            })
+                          }>
+                          Update
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => toggleCatalogActive(item)}>
+                          {item.active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {editingItem ? (
+            <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4 sm:grid-cols-5">
+              <Input
+                placeholder="Material name"
+                value={editingItem.materials}
+                onChange={(e) => setEditingItem((p) => ({ ...p, materials: e.target.value }))}
+              />
+              <Input
+                placeholder="UOM"
+                value={editingItem.uom}
+                onChange={(e) => setEditingItem((p) => ({ ...p, uom: e.target.value }))}
+              />
+              <Input
+                placeholder="Price ($)"
+                value={editingItem.priceDollars}
+                onChange={(e) => setEditingItem((p) => ({ ...p, priceDollars: e.target.value }))}
+              />
+              <select
+                className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
+                value={editingItem.active ? 'active' : 'inactive'}
+                onChange={(e) => setEditingItem((p) => ({ ...p, active: e.target.value === 'active' }))}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <div className="flex gap-2">
+                <Button type="button" onClick={updateCatalogItem}>Save</Button>
+                <Button type="button" variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
     </div>
