@@ -65,16 +65,12 @@ function SignInPage() {
         <div className="relative z-10 max-w-xl space-y-8">
           <p className="text-xs uppercase tracking-[0.35em] text-sky-300">Handy Dudes</p>
           <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-            Premium service.
-            <br />
-            Honest people.
-            <br />
-            Zero headaches.
+            Welcome to Handy Dudes Sales & Dispatch Platform.
           </h1>
           <p className="max-w-lg text-base leading-relaxed text-zinc-300 sm:text-lg">
-            Handy Dudes helps homeowners and businesses get repairs, maintenance,
-            and upgrades done right. We combine skilled professionals with clear
-            communication so every job feels effortless from first call to final walkthrough.
+            Turn Jobber requests into accurate quotes faster with AI-assisted
+            workflows, clear handoffs, and one place to manage the pipeline from
+            intake to follow-up.
           </p>
         </div>
       </section>

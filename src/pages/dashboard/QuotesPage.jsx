@@ -5,6 +5,11 @@ import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, FileText, CheckCircle, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  buildLegacyQuoteContinueState,
+  buildRequestContinueState,
+  getLinkedJobberRequestId,
+} from './quoteContinue'
 
 function formatMoneyFromCents(cents) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100)
@@ -103,8 +108,31 @@ function QuotesPage() {
     }
   }
 
-  function handleContinueDraft(quoteId) {
-    navigate('/dashboard/ai-assistant', { state: { resumeQuoteId: quoteId } })
+  async function handleContinueDraft(quote) {
+    const quoteId = String(quote?.id ?? '').trim()
+    if (!quoteId) return
+    const jobberRequestId = getLinkedJobberRequestId(quote)
+    setError('')
+    try {
+      if (jobberRequestId) {
+        const continueResponse = await apiRequest(
+          `/api/sales/requests/${encodeURIComponent(jobberRequestId)}/continue`,
+          { method: 'POST' }
+        )
+        navigate('/dashboard/ai-assistant', {
+          state: buildRequestContinueState({
+            jobberRequestId,
+            continueResponse,
+            fallbackQuoteId: quoteId,
+          }),
+        })
+        return
+      }
+      // Legacy fallback for older quotes that are not linked to a request id.
+      navigate('/dashboard/ai-assistant', { state: buildLegacyQuoteContinueState(quoteId) })
+    } catch (err) {
+      setError(err?.message || 'Failed to continue this quote in AI Assistant')
+    }
   }
 
   function openDeleteQuoteModal(quote) {
@@ -266,12 +294,6 @@ function QuotesPage() {
                 className="h-9 w-52 text-sm"
               />
             </div>
-            <Button
-              type="button"
-              className="h-9 text-sm"
-              onClick={() => navigate('/dashboard/ai-assistant', { state: { startNewChat: true } })}>
-              + Create Quote
-            </Button>
           </div>
         </div>
 
@@ -332,7 +354,7 @@ function QuotesPage() {
             </p>
             <p className="mt-1 text-xs text-zinc-400">
               {quotes.length === 0
-                ? 'Click "+ Create Quote" above to get started.'
+                ? 'Start a quote from a request using AI Assistant.'
                 : 'Try adjusting your search or clearing the filters.'}
             </p>
           </div>
@@ -510,7 +532,7 @@ function QuotesPage() {
                 )}
               </div>
               <div className="flex gap-2 pt-1">
-                <Button type="button" onClick={() => handleContinueDraft(selectedQuote.id)}>
+                <Button type="button" onClick={() => handleContinueDraft(selectedQuote)}>
                   {selectedQuote.status === 'draft'
                     ? 'Continue This Draft in AI Assistant'
                     : 'Edit Again in AI Assistant'}

@@ -500,7 +500,7 @@ function AiAssistantPage() {
   /** Last successful Create Quote handoff (React Router location.key) so we do not double-run or block retries. */
   const processedCreateQuoteHandoffKeyRef = useRef(null)
   const processedJobberSeedHandoffKeyRef = useRef(null)
-  const didHandleQuoteResumeRef = useRef(false)
+  const isHandlingQuoteResumeRef = useRef(false)
 
   function scrollToLatest(behavior = 'smooth') {
     chatBottomRef.current?.scrollIntoView({ behavior, block: 'end' })
@@ -508,11 +508,12 @@ function AiAssistantPage() {
 
   useEffect(() => {
     const hasResumeQuote = Boolean(location.state?.resumeQuoteId)
+    const hasRequestContinueMeta = Boolean(location.state?.requestContinueMeta)
     const hasContactHandoff = Boolean(location.state?.contactId && location.state?.startNewChat)
     const hasJobberSeedOnly = Boolean(
       location.state?.startNewChat && location.state?.jobberRequestSeed && !location.state?.contactId
     )
-    if (hasResumeQuote || hasContactHandoff || hasJobberSeedOnly) {
+    if (hasResumeQuote || hasRequestContinueMeta || hasContactHandoff || hasJobberSeedOnly) {
       // Resume/handoff flows manage their own thread hydration and would be
       // overwritten by a concurrent default thread load.
       setIsLoadingThread(false)
@@ -552,9 +553,46 @@ function AiAssistantPage() {
   }, [location.state])
 
   useEffect(() => {
+    const continueMeta = location.state?.requestContinueMeta
+    const jobberRequestId = String(location.state?.jobberRequestId ?? '').trim()
+    if (!continueMeta || !jobberRequestId) return
+    let cancelled = false
+    async function hydrateFromRequestContinue() {
+      try {
+        setIsLoadingThread(true)
+        setChatError('')
+        const threadResponse = await apiRequest('/api/sales/ai-assistant/thread')
+        if (cancelled) return
+        setMessages(normalizeMessages(threadResponse?.messages))
+        if (threadResponse?.quoteDraft) setQuoteDraft(recalcDraft(threadResponse.quoteDraft))
+        setSelectedClientId(threadResponse?.selectedClientId ?? '')
+        setDraftUpdated(false)
+        didLoadThreadRef.current = true
+        setActionNotice(
+          continueMeta?.resumed
+            ? 'Resumed existing draft for this request.'
+            : 'Started a new draft for this request.'
+        )
+        navigate(location.pathname, { replace: true, state: null })
+        requestAnimationFrame(() => scrollToLatest('auto'))
+      } catch (error) {
+        if (cancelled) return
+        setChatError(error?.message || 'Failed to continue request in AI assistant')
+      } finally {
+        if (!cancelled) setIsLoadingThread(false)
+      }
+    }
+    void hydrateFromRequestContinue()
+    return () => {
+      cancelled = true
+    }
+  }, [location.state, location.pathname, navigate])
+
+  useEffect(() => {
+    if (location.state?.requestContinueMeta) return
     const resumeQuoteId = location.state?.resumeQuoteId
-    if (!resumeQuoteId || didHandleQuoteResumeRef.current) return
-    didHandleQuoteResumeRef.current = true
+    if (!resumeQuoteId || isHandlingQuoteResumeRef.current) return
+    isHandlingQuoteResumeRef.current = true
     let cancelled = false
     async function runQuoteResume() {
       try {
@@ -575,8 +613,13 @@ function AiAssistantPage() {
         requestAnimationFrame(() => scrollToLatest('auto'))
       } catch (error) {
         if (cancelled) return
-        setChatError(error?.message || 'Failed to load selected draft quote')
+        const message = error?.message || 'Failed to load selected draft quote'
+        setChatError(message)
+        if (String(message).toLowerCase().includes('cannot be reopened')) {
+          setActionNotice('This quote cannot be reopened directly. Start from Requests > Continue with AI to relink it.')
+        }
       } finally {
+        isHandlingQuoteResumeRef.current = false
         if (!cancelled) setIsLoadingThread(false)
       }
     }
@@ -590,7 +633,7 @@ function AiAssistantPage() {
     const handoffContactId = location.state?.contactId
     const handoffClient = location.state?.handoffClient
     const shouldStartNewChat = Boolean(location.state?.startNewChat)
-    if (!handoffContactId || !shouldStartNewChat) return
+    if (!handoffContactId || !shouldStartNewChat || location.state?.requestContinueMeta) return
 
     const navKey = location.key
     if (processedCreateQuoteHandoffKeyRef.current === navKey) return
@@ -643,7 +686,8 @@ function AiAssistantPage() {
     }
   }, [location.key, location.state, location.pathname, navigate])
 
-  async function applyJobberSeed(seed, navKey, wasSaved) {
+  async function applyJobberSeed(seed, navKey) {
+    const jobberRequestId = String(location.state?.jobberRequestId ?? '').trim() || undefined
     const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
     setMessages(normalizeMessages(resetResponse?.messages))
     const base = resetResponse?.quoteDraft ? recalcDraft(resetResponse.quoteDraft) : createDefaultQuoteDraft()
@@ -656,7 +700,7 @@ function AiAssistantPage() {
     if (t || d) {
       await apiRequest('/api/sales/ai-assistant/thread/draft', {
         method: 'PATCH',
-        body: JSON.stringify({ title: t || undefined, quoteDescription: d || undefined }),
+        body: JSON.stringify({ title: t || undefined, quoteDescription: d || undefined, jobberRequestId }),
       })
     }
     didLoadThreadRef.current = true
@@ -671,7 +715,7 @@ function AiAssistantPage() {
     setChatError('')
     try {
       await apiRequest('/api/sales/ai-assistant/draft/save', { method: 'POST' })
-      await applyJobberSeed(pendingSeedHandoff.seed, pendingSeedHandoff.navKey, true)
+      await applyJobberSeed(pendingSeedHandoff.seed, pendingSeedHandoff.navKey)
       setPendingSeedHandoff(null)
     } catch (error) {
       setChatError(error?.message || 'Failed to save previous draft')
@@ -684,7 +728,7 @@ function AiAssistantPage() {
     if (!pendingSeedHandoff || isHandoffSaving) return
     setIsHandoffSaving(true)
     try {
-      await applyJobberSeed(pendingSeedHandoff.seed, pendingSeedHandoff.navKey, false)
+      await applyJobberSeed(pendingSeedHandoff.seed, pendingSeedHandoff.navKey)
       setPendingSeedHandoff(null)
     } catch (error) {
       setChatError(error?.message || 'Failed to start from Jobber request')
@@ -694,6 +738,9 @@ function AiAssistantPage() {
   }
 
   async function continueContactHandoff({ handoffContactId, handoffClient, seed, navKey }) {
+    const requestMeta = location.state?.requestContinueMeta
+    const shouldRunInitialPrompt = Boolean(requestMeta?.created)
+    const jobberRequestId = String(location.state?.jobberRequestId ?? '').trim() || undefined
     const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
     setMessages(normalizeMessages(resetResponse?.messages))
     if (resetResponse?.quoteDraft) {
@@ -723,7 +770,7 @@ function AiAssistantPage() {
       if (t || d) {
         await apiRequest('/api/sales/ai-assistant/thread/draft', {
           method: 'PATCH',
-          body: JSON.stringify({ title: t || undefined, quoteDescription: d || undefined }),
+          body: JSON.stringify({ title: t || undefined, quoteDescription: d || undefined, jobberRequestId }),
         })
       }
 
@@ -731,7 +778,7 @@ function AiAssistantPage() {
       if (t) parts.push(`Service: ${t}`)
       if (d) parts.push(`Request details:\n${d}`)
       const autoPrompt = parts.join('\n\n')
-      if (autoPrompt) {
+      if (autoPrompt && shouldRunInitialPrompt) {
         setIsSending(true)
         try {
           const aiResponse = await apiRequest('/api/sales/ai-assistant/chat', {
@@ -784,7 +831,7 @@ function AiAssistantPage() {
     const seed = location.state?.jobberRequestSeed
     const shouldStart = Boolean(location.state?.startNewChat)
     const contactId = location.state?.contactId
-    if (!shouldStart || !seed || contactId) return
+    if (!shouldStart || !seed || contactId || location.state?.requestContinueMeta) return
 
     const navKey = location.key
     if (processedJobberSeedHandoffKeyRef.current === navKey) return
@@ -812,7 +859,7 @@ function AiAssistantPage() {
           return
         }
 
-        await applyJobberSeed(seed, navKey, false)
+        await applyJobberSeed(seed, navKey)
       } catch (error) {
         if (cancelled) return
         setChatError(error?.message || 'Failed to start from Jobber request')
@@ -1242,7 +1289,11 @@ function AiAssistantPage() {
     setActionNotice('')
     setIsSavingDraft(true)
     try {
-      const response = await apiRequest('/api/sales/ai-assistant/draft/save', { method: 'POST' })
+      const jobberRequestId = String(location.state?.jobberRequestId ?? '').trim() || undefined
+      const response = await apiRequest('/api/sales/ai-assistant/draft/save', {
+        method: 'POST',
+        body: JSON.stringify({ jobberRequestId, quoteDraft }),
+      })
       const quoteId = String(response?.quote?.id ?? '')
       const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
       setMessages(normalizeMessages(resetResponse?.messages))
@@ -1271,7 +1322,11 @@ function AiAssistantPage() {
     setActionNotice('')
     setIsApprovingQuote(true)
     try {
-      const response = await apiRequest('/api/sales/ai-assistant/draft/approve', { method: 'POST' })
+      const jobberRequestId = String(location.state?.jobberRequestId ?? '').trim() || undefined
+      const response = await apiRequest('/api/sales/ai-assistant/draft/approve', {
+        method: 'POST',
+        body: JSON.stringify({ jobberRequestId, quoteDraft }),
+      })
       const quoteId = String(response?.quote?.id ?? '')
       const syncStatus = String(response?.jobberSync?.status ?? '')
       const syncError = String(response?.jobberSync?.error ?? '')

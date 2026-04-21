@@ -51,6 +51,21 @@ function formatFullDate(value) {
   }
 }
 
+function toText(value) {
+  return String(value ?? '').trim()
+}
+
+function renderThumbtackField(label, value) {
+  const text = toText(value)
+  if (!text) return null
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className="text-sm text-zinc-800 whitespace-pre-wrap">{text}</p>
+    </div>
+  )
+}
+
 const AVATAR_COLORS = [
   'bg-blue-100 text-blue-700',
   'bg-emerald-100 text-emerald-700',
@@ -149,28 +164,47 @@ function RequestsPage() {
     return c
   }, [requests])
 
-  function handleContinueWithAI(item, event) {
+  async function handleContinueWithAI(item, event) {
     event?.stopPropagation()
     const seed = buildQuoteSeed(item)
+    const jobberRequestId = String(item.jobberRequestId ?? '').trim()
+    if (!jobberRequestId) {
+      setErrorMessage('This request is missing Jobber request id, cannot continue with AI.')
+      return
+    }
+    try {
+      const continueResponse = await apiRequest(
+        `/api/sales/requests/${encodeURIComponent(jobberRequestId)}/continue`,
+        { method: 'POST' }
+      )
+      const created = Boolean(continueResponse?.created)
+      const resumed = Boolean(continueResponse?.resumed)
+      const quoteId = String(continueResponse?.quoteId ?? '')
     const hasLead = Boolean(item.leadId?.trim())
-    navigate('/dashboard/ai-assistant', {
-      state: {
-        ...(hasLead
-          ? {
-              contactId: item.leadId,
-              startNewChat: true,
-              handoffClient: {
-                fullName: item.name || '',
-                phone: item.phone || '',
-                email: item.email || '',
-                address: [item.addressLine1, item.city, item.state, item.postalCode].filter(Boolean).join(', '),
-              },
-            }
-          : { startNewChat: true }),
-        jobberRequestSeed: seed,
-      },
-    })
-    setSelected(null)
+      navigate('/dashboard/ai-assistant', {
+        state: {
+          ...(hasLead
+            ? {
+                contactId: item.leadId,
+                startNewChat: true,
+                handoffClient: {
+                  fullName: item.name || '',
+                  phone: item.phone || '',
+                  email: item.email || '',
+                  address: [item.addressLine1, item.city, item.state, item.postalCode].filter(Boolean).join(', '),
+                },
+              }
+            : { startNewChat: true }),
+          jobberRequestSeed: seed,
+          jobberRequestId,
+          requestContinueMeta: { created, resumed, quoteId },
+        },
+      })
+      setSelected(null)
+      setErrorMessage('')
+    } catch (error) {
+      setErrorMessage(error?.message || 'Failed to continue request draft in AI assistant')
+    }
   }
 
   return (
@@ -283,7 +317,7 @@ function RequestsPage() {
                   <th className="px-4 py-3">Property</th>
                   <th className="px-4 py-3">Contact</th>
                   <th className="px-4 py-3">Requested</th>
-                  <th className="px-4 py-3" />
+                  <th className="px-4 py-3 text-right">AI quote</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
@@ -322,11 +356,11 @@ function RequestsPage() {
                       {formatRequested(item.createdAt)}
                     </td>
                     {/* AI action */}
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-right">
                       <Button
                         type="button"
                         size="sm"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-xs"
+                        className="whitespace-nowrap text-xs font-medium bg-sky-500 text-white hover:bg-sky-600 shadow-sm"
                         onClick={(e) => handleContinueWithAI(item, e)}>
                         Continue with AI
                       </Button>
@@ -449,6 +483,74 @@ function RequestsPage() {
                   <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Assessment instructions</p>
                   <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5">
                     <p className="whitespace-pre-wrap text-zinc-800">{selected.assessmentInstructions}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              {selected.thumbtackDetails && typeof selected.thumbtackDetails === 'object' ? (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">Thumbtack details</p>
+                  <div className="space-y-3 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2.5">
+                    {renderThumbtackField('Travel preferences', selected.thumbtackDetails?.requestDetails?.travelPreferences)}
+                    {renderThumbtackField('Zip code', selected.thumbtackDetails?.requestDetails?.zipCode)}
+                    {renderThumbtackField('Number of items', selected.thumbtackDetails?.requestDetails?.numberOfItems)}
+                    {renderThumbtackField('Types of items', selected.thumbtackDetails?.requestDetails?.itemTypes)}
+                    {renderThumbtackField(
+                      'Instructions provided by client',
+                      selected.thumbtackDetails?.requestDetails?.instructionsProvided
+                    )}
+                    {renderThumbtackField('Category', selected.thumbtackDetails?.requestDetails?.category)}
+                    {renderThumbtackField('Scheduling', selected.thumbtackDetails?.requestDetails?.scheduling)}
+                    {renderThumbtackField('Access code', selected.thumbtackDetails?.requestDetails?.accessCode)}
+                    {renderThumbtackField(
+                      'Customer availability',
+                      selected.thumbtackDetails?.requestDetails?.customerAvailability
+                    )}
+                    {renderThumbtackField(
+                      'Lead price',
+                      selected.thumbtackDetails?.leadPrice != null ? `$${selected.thumbtackDetails.leadPrice}` : ''
+                    )}
+                    {selected.thumbtackDetails?.thumbtackConversationUrl ? (
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Thumbtack conversation</p>
+                        <a
+                          href={selected.thumbtackDetails.thumbtackConversationUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sky-600 underline underline-offset-2 hover:text-sky-700 break-all">
+                          {selected.thumbtackDetails.thumbtackConversationUrl}
+                        </a>
+                      </div>
+                    ) : null}
+                    {Array.isArray(selected.thumbtackDetails?.customerImages) &&
+                    selected.thumbtackDetails.customerImages.length > 0 ? (
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Customer images</p>
+                        <div className="space-y-1">
+                          {selected.thumbtackDetails.customerImages.map((url, idx) => (
+                            <a
+                              key={`${url}-${idx}`}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block text-sky-600 underline underline-offset-2 hover:text-sky-700 break-all">
+                              {url}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {Array.isArray(selected.thumbtackDetails?.customerAttachments) &&
+                    selected.thumbtackDetails.customerAttachments.length > 0 ? (
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Customer attachments</p>
+                        <ul className="list-disc pl-5 text-sm text-zinc-800 space-y-1">
+                          {selected.thumbtackDetails.customerAttachments.map((name, idx) => (
+                            <li key={`${name}-${idx}`}>{name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
