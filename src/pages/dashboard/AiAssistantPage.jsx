@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
-import { Bot, Copy, FileText, History, UserCircle2, X } from 'lucide-react'
+import { Bot, Copy, FileText, History, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 function toInt(value) {
@@ -1435,20 +1435,9 @@ function AiAssistantPage() {
           </div>
           <div className="min-h-0 flex flex-1 flex-col overflow-hidden px-5 pb-5 pt-4">
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_130px]">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-zinc-600">Quote Title</label>
-                  <Input value={quoteDraft.title} onChange={(event) => updateQuoteField('title', event.target.value)} />
-                </div>
-                <div className="mt-6 flex h-8 items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-1.5">
-                  <UserCircle2 className="h-3 w-3 shrink-0 text-zinc-500" />
-                  <div className="min-w-0">
-                    <p className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500">Rep</p>
-                    <p className="truncate text-[10px] text-zinc-700">
-                      {quoteDraft.salespersonName || 'Assigned sales rep'}
-                    </p>
-                  </div>
-                </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-600">Quote Title</label>
+                <Input value={quoteDraft.title} onChange={(event) => updateQuoteField('title', event.target.value)} />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-zinc-600">Quote Description</label>

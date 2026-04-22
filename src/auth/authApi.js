@@ -1,5 +1,5 @@
 import { apiRequest } from '@/lib/apiClient'
-import { getSalesRefreshToken } from '@/auth/authTokenStorage'
+import { applyTokenResponse, getSalesRefreshToken } from '@/auth/authTokenStorage'
 
 export function login({ email, password }) {
   return apiRequest('/auth/login', {
@@ -12,13 +12,15 @@ export function getMe() {
   return apiRequest('/auth/me')
 }
 
-export function refreshSession() {
+export async function refreshSession() {
   const refreshToken = getSalesRefreshToken()
   const body = refreshToken ? JSON.stringify({ refreshToken }) : undefined
-  return apiRequest('/auth/refresh', {
+  const response = await apiRequest('/auth/refresh', {
     method: 'POST',
     ...(body ? { body } : {}),
   })
+  applyTokenResponse(response)
+  return response
 }
 
 export function logout() {

@@ -18,7 +18,6 @@ export function AuthProvider({ children }) {
       } catch (error) {
         try {
           const refreshed = await refreshSession()
-          applyTokenResponse(refreshed)
           if (!cancelled) setUser(refreshed.user)
         } catch {
           clearSalesTokens()

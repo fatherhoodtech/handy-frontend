@@ -215,53 +215,120 @@ export default function LaborPricingPage() {
             </Button>
           </div>
           <div className="overflow-hidden rounded-xl border border-zinc-200">
-            <table className="min-w-full">
-              <thead className="border-b border-zinc-200 bg-white">
-                <tr>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Trade</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Expertise</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Hourly Rate</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {filteredLabor.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-5 py-8 text-center text-sm text-zinc-400">
-                      {laborItems.length === 0 ? 'No labor rates yet. Create one above.' : 'No rows match current filters.'}
-                    </td>
-                  </tr>
-                ) : filteredLabor.map((row) => (
-                  <tr key={row.id} className="hover:bg-zinc-50">
-                    <td className="px-5 py-3 text-sm font-medium text-zinc-900">{row.trade}</td>
-                    <td className="px-5 py-3 text-sm text-zinc-600 capitalize">{row.expertiseLevel}</td>
-                    <td className="px-5 py-3 text-sm font-medium text-zinc-900">${centsToDollars(row.hourlyRateCents)}/hr</td>
-                    <td className="px-5 py-3">
-                      <span className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+            <div className="divide-y divide-zinc-100 md:hidden">
+              {filteredLabor.length === 0 ? (
+                <div className="px-5 py-8 text-center text-sm text-zinc-400">
+                  {laborItems.length === 0 ? 'No labor rates yet. Create one above.' : 'No rows match current filters.'}
+                </div>
+              ) : filteredLabor.map((row) => (
+                <div key={row.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-900">{row.trade}</p>
+                      <p className="text-sm capitalize text-zinc-600">{row.expertiseLevel}</p>
+                    </div>
+                    <span className={cn(
+                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+                      row.active
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        : 'border-zinc-200 bg-zinc-50 text-zinc-500'
+                    )}>
+                      <span className={cn('h-1.5 w-1.5 rounded-full', row.active ? 'bg-emerald-500' : 'bg-zinc-300')} />
+                      {row.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm font-medium text-zinc-900">${centsToDollars(row.hourlyRateCents)}/hr</p>
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+                      onClick={() => openUpdateModal(row)}>
+                      Update
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        'flex-1',
                         row.active
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                          : 'border-zinc-200 bg-zinc-50 text-zinc-500'
-                      )}>
-                        <span className={cn('h-1.5 w-1.5 rounded-full', row.active ? 'bg-emerald-500' : 'bg-zinc-300')} />
-                        {row.active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <div className="inline-flex min-w-[190px] justify-end gap-2">
-                        <Button type="button" variant="outline" size="sm" className="w-24" onClick={() => openUpdateModal(row)}>
-                          Update
-                        </Button>
-                        <Button type="button" variant="outline" size="sm" className="w-24" onClick={() => toggleLaborActive(row)}>
-                          {row.active ? 'Deactivate' : 'Activate'}
-                        </Button>
-                      </div>
-                    </td>
+                          ? 'border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50'
+                          : 'border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50'
+                      )}
+                      onClick={() => toggleLaborActive(row)}>
+                      {row.active ? 'Deactivate' : 'Activate'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block">
+              <table className="min-w-full">
+                <thead className="border-b border-zinc-200 bg-white">
+                  <tr>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Trade</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Expertise</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Hourly Rate</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
+                    <th className="px-5 py-3" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {filteredLabor.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-8 text-center text-sm text-zinc-400">
+                        {laborItems.length === 0 ? 'No labor rates yet. Create one above.' : 'No rows match current filters.'}
+                      </td>
+                    </tr>
+                  ) : filteredLabor.map((row) => (
+                    <tr key={row.id} className="hover:bg-zinc-50">
+                      <td className="px-5 py-3 text-sm font-medium text-zinc-900">{row.trade}</td>
+                      <td className="px-5 py-3 text-sm text-zinc-600 capitalize">{row.expertiseLevel}</td>
+                      <td className="px-5 py-3 text-sm font-medium text-zinc-900">${centsToDollars(row.hourlyRateCents)}/hr</td>
+                      <td className="px-5 py-3">
+                        <span className={cn(
+                          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+                          row.active
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-zinc-200 bg-zinc-50 text-zinc-500'
+                        )}>
+                          <span className={cn('h-1.5 w-1.5 rounded-full', row.active ? 'bg-emerald-500' : 'bg-zinc-300')} />
+                          {row.active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="inline-flex min-w-[190px] justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-24 border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+                            onClick={() => openUpdateModal(row)}>
+                            Update
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              'w-24',
+                              row.active
+                                ? 'border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50'
+                                : 'border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50'
+                            )}
+                            onClick={() => toggleLaborActive(row)}>
+                            {row.active ? 'Deactivate' : 'Activate'}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
           {showCreate ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setShowCreate(false)}>

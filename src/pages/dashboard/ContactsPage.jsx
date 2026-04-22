@@ -51,8 +51,8 @@ function ContactsPage() {
   const [selectedContactName, setSelectedContactName] = useState('')
   const [deleteModalContact, setDeleteModalContact] = useState(null)
   const [updateModalContact, setUpdateModalContact] = useState(null)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [sourceFilter, setSourceFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
   const [updateFormData, setUpdateFormData] = useState({
     firstName: '', middleName: '', lastName: '',
@@ -63,30 +63,39 @@ function ContactsPage() {
   const [didAutoOpenEdit, setDidAutoOpenEdit] = useState(false)
   const [pendingAutoEditContact, setPendingAutoEditContact] = useState(null)
   const [requiredContactFieldKeys, setRequiredContactFieldKeys] = useState([])
+  const [createFormData, setCreateFormData] = useState({
+    firstName: '', middleName: '', lastName: '',
+    email: '', phone: '',
+    addressLine1: '', addressLine2: '',
+    city: '', state: 'AL', postalCode: '',
+  })
 
   const sortedContacts = useMemo(
     () => [...contacts].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
     [contacts]
   )
-  const sourceOptions = useMemo(() => {
-    const set = new Set(sortedContacts.map((c) => (c.source || 'unknown').toLowerCase()))
-    return ['all', ...Array.from(set)]
-  }, [sortedContacts])
   const filteredContacts = useMemo(() => {
     const now = Date.now()
     return sortedContacts.filter((contact) => {
       const searchText = `${contact.name || ''} ${contact.email || ''} ${contact.phone || ''}`.toLowerCase()
       const matchesSearch = search.trim() === '' || searchText.includes(search.trim().toLowerCase())
-      const source = (contact.source || 'unknown').toLowerCase()
-      const matchesSource = sourceFilter === 'all' || source === sourceFilter
       const createdAtMs = new Date(contact.createdAt).getTime()
       const matchesDate =
         dateFilter === 'all' ||
+        (dateFilter === 'today' && (() => {
+          const created = new Date(contact.createdAt)
+          const current = new Date()
+          return (
+            created.getFullYear() === current.getFullYear() &&
+            created.getMonth() === current.getMonth() &&
+            created.getDate() === current.getDate()
+          )
+        })()) ||
         (dateFilter === '7d' && now - createdAtMs <= 7 * 24 * 60 * 60 * 1000) ||
         (dateFilter === '30d' && now - createdAtMs <= 30 * 24 * 60 * 60 * 1000)
-      return matchesSearch && matchesSource && matchesDate
+      return matchesSearch && matchesDate
     })
-  }, [sortedContacts, search, sourceFilter, dateFilter])
+  }, [sortedContacts, search, dateFilter])
 
   const newThisWeek = useMemo(() => {
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
@@ -257,6 +266,48 @@ function ContactsPage() {
     }
   }
 
+  function openCreateModal() {
+    setCreateFormData({
+      firstName: '', middleName: '', lastName: '',
+      email: '', phone: '',
+      addressLine1: '', addressLine2: '',
+      city: '', state: 'AL', postalCode: '',
+    })
+    setCreateModalOpen(true)
+  }
+
+  function closeCreateModal() {
+    if (isSubmitting) return
+    setCreateModalOpen(false)
+  }
+
+  function handleCreateInputChange(event) {
+    const { name, value } = event.target
+    setCreateFormData((current) => ({ ...current, [name]: value }))
+  }
+
+  async function handleSubmitCreateContact(event) {
+    event.preventDefault()
+    try {
+      setErrorMessage('')
+      setIsSubmitting(true)
+      const response = await apiRequest('/api/sales/contacts', {
+        method: 'POST',
+        body: JSON.stringify(createFormData),
+      })
+      const created = response?.contact
+      if (created?.id) {
+        setContacts((current) => [created, ...current])
+        setSelectedContactName(`${created.name || 'Contact'} - Created`)
+      }
+      setCreateModalOpen(false)
+    } catch (error) {
+      setErrorMessage(error?.message || 'Failed to create contact')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   function formatRelativeTime(iso) {
     const diffMs = Date.now() - new Date(iso).getTime()
     if (!Number.isFinite(diffMs) || diffMs < 0) return 'just now'
@@ -299,7 +350,7 @@ function ContactsPage() {
     return isRequiredField(key) ? 'border-red-400 focus:border-red-500 focus-visible:ring-red-500/40' : ''
   }
 
-  const hasActiveFilters = search.trim() || sourceFilter !== 'all' || dateFilter !== 'all'
+  const hasActiveFilters = search.trim() || dateFilter !== 'all'
 
   return (
     <>
@@ -364,50 +415,40 @@ function ContactsPage() {
               </span>
             )}
           </div>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search contacts..."
-              className="h-9 w-52 pl-8 text-sm"
-            />
-          </div>
-        </div>
-
-        {/* Filter pills row */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-zinc-50/60 px-5 py-2.5">
-          {sourceOptions.map((source) => (
-            <button
-              key={source}
-              type="button"
-              onClick={() => setSourceFilter(source)}
-              className={cn(
-                'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
-                sourceFilter === source
-                  ? 'border-sky-500 bg-sky-500 text-white'
-                  : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100'
-              )}>
-              {source === 'all' ? 'All sources' : titleCase(source)}
-            </button>
-          ))}
-          <div className="ml-auto flex items-center gap-2">
-            <select
-              className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none focus:border-zinc-400"
-              value={dateFilter}
-              onChange={(event) => setDateFilter(event.target.value)}>
-              <option value="all">All time</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-            </select>
-            {hasActiveFilters && (
-              <button
-                type="button"
-                className="text-xs font-medium text-zinc-500 hover:text-zinc-800 underline underline-offset-2"
-                onClick={() => { setSearch(''); setSourceFilter('all'); setDateFilter('all') }}>
-                Clear filters
-              </button>
-            )}
+          <div className="ml-auto flex w-full max-w-xl flex-col items-end gap-2">
+            <div className="flex w-full items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search contacts..."
+                  className="h-9 w-full pl-8 text-sm"
+                />
+              </div>
+              <Button type="button" className="shrink-0 bg-sky-500 text-white hover:bg-sky-600" onClick={openCreateModal}>
+                New Contact
+              </Button>
+            </div>
+            <div className="flex w-full items-center justify-end gap-2">
+              <select
+                className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none focus:border-zinc-400"
+                value={dateFilter}
+                onChange={(event) => setDateFilter(event.target.value)}>
+                <option value="all">All time</option>
+                <option value="today">Today</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+              </select>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-zinc-500 hover:text-zinc-800 underline underline-offset-2"
+                  onClick={() => { setSearch(''); setDateFilter('all') }}>
+                  Clear filters
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -440,55 +481,87 @@ function ContactsPage() {
 
         {/* Table */}
         {!isLoading && filteredContacts.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-                <thead className="border-b border-zinc-200 bg-white">
-                  <tr>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Name</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Email / Phone</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Location</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Source</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Added</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
-                  {filteredContacts.map((contact) => {
-                    const badge = sourceBadge(contact.source)
-                    return (
-                      <tr
-                        key={contact.id}
-                        className="cursor-pointer transition-colors hover:bg-zinc-50"
-                        onClick={() => handleContactClick(contact)}>
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold', avatarColor(contact.name))}>
-                              {getInitials(contact.name)}
+          <div>
+            <div className="divide-y divide-zinc-100 md:hidden">
+              {filteredContacts.map((contact) => {
+                const badge = sourceBadge(contact.source)
+                return (
+                  <button
+                    key={contact.id}
+                    type="button"
+                    className="w-full px-4 py-3 text-left transition-colors hover:bg-zinc-50"
+                    onClick={() => handleContactClick(contact)}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-zinc-900">{contact.name || 'Unnamed contact'}</p>
+                        {(contact.email || contact.phone) ? (
+                          <p className="truncate text-sm text-zinc-600">{contact.email || contact.phone}</p>
+                        ) : null}
+                      </div>
+                      <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold', badge.className)}>
+                        <span className={cn('h-1.5 w-1.5 rounded-full', badge.dot)} />
+                        {badge.label}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-zinc-600">
+                      {[contact.addressLine1, contact.city, contact.state, contact.postalCode].filter(Boolean).join(', ') || '—'}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-500">{formatRelativeTime(contact.createdAt)}</p>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="min-w-full">
+                  <thead className="border-b border-zinc-200 bg-white">
+                    <tr>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Name</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Email / Phone</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Location</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Source</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Added</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {filteredContacts.map((contact) => {
+                      const badge = sourceBadge(contact.source)
+                      return (
+                        <tr
+                          key={contact.id}
+                          className="cursor-pointer transition-colors hover:bg-zinc-50"
+                          onClick={() => handleContactClick(contact)}>
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold', avatarColor(contact.name))}>
+                                {getInitials(contact.name)}
+                              </div>
+                              <span className="text-sm font-semibold text-zinc-900">
+                                {contact.name || 'Unnamed contact'}
+                              </span>
                             </div>
-                            <span className="text-sm font-semibold text-zinc-900">
-                              {contact.name || 'Unnamed contact'}
+                          </td>
+                          <td className="px-5 py-3.5 text-sm text-zinc-600">
+                            {contact.email || contact.phone || <span className="text-zinc-300">—</span>}
+                          </td>
+                          <td className="px-5 py-3.5 text-sm text-zinc-600">
+                            {[contact.city, contact.state].filter(Boolean).join(', ') || <span className="text-zinc-300">—</span>}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold', badge.className)}>
+                              <span className={cn('h-1.5 w-1.5 rounded-full', badge.dot)} />
+                              {badge.label}
                             </span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 text-sm text-zinc-600">
-                          {contact.email || contact.phone || <span className="text-zinc-300">—</span>}
-                        </td>
-                        <td className="px-5 py-3.5 text-sm text-zinc-600">
-                          {[contact.city, contact.state].filter(Boolean).join(', ') || <span className="text-zinc-300">—</span>}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold', badge.className)}>
-                            <span className={cn('h-1.5 w-1.5 rounded-full', badge.dot)} />
-                            {badge.label}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3.5 text-sm text-zinc-500">
-                          {formatRelativeTime(contact.createdAt)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-            </table>
+                          </td>
+                          <td className="whitespace-nowrap px-5 py-3.5 text-sm text-zinc-500">
+                            {formatRelativeTime(contact.createdAt)}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -646,6 +719,80 @@ function ContactsPage() {
               <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="outline" onClick={closeUpdateModal} disabled={isSubmitting}>Cancel</Button>
                 <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Changes'}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Create modal */}
+      {createModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
+          onClick={closeCreateModal}
+          onKeyDown={(event) => { if (event.key === 'Escape') closeCreateModal() }}
+          role="button"
+          tabIndex={0}>
+          <div
+            className="w-full max-w-3xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true">
+            <h3 className="text-base font-bold text-zinc-900">Create Contact</h3>
+            <p className="mt-1 text-sm text-zinc-600">Add the client details needed for quotes and Jobber sync.</p>
+            <form onSubmit={handleSubmitCreateContact} className="mt-4 space-y-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-firstName">First Name</Label>
+                  <Input id="create-firstName" name="firstName" value={createFormData.firstName} onChange={handleCreateInputChange} required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-middleName">Middle Name</Label>
+                  <Input id="create-middleName" name="middleName" value={createFormData.middleName} onChange={handleCreateInputChange} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-lastName">Last Name</Label>
+                  <Input id="create-lastName" name="lastName" value={createFormData.lastName} onChange={handleCreateInputChange} required />
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-email">Email</Label>
+                  <Input id="create-email" name="email" type="email" value={createFormData.email} onChange={handleCreateInputChange} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-phone">Phone</Label>
+                  <Input id="create-phone" name="phone" value={createFormData.phone} onChange={handleCreateInputChange} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="create-addressLine1">Address Line 1</Label>
+                <Input id="create-addressLine1" name="addressLine1" value={createFormData.addressLine1} onChange={handleCreateInputChange} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="create-addressLine2">Address Line 2</Label>
+                <Input id="create-addressLine2" name="addressLine2" value={createFormData.addressLine2} onChange={handleCreateInputChange} />
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-city">City</Label>
+                  <Input id="create-city" name="city" value={createFormData.city} onChange={handleCreateInputChange} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-state">State</Label>
+                  <Input id="create-state" name="state" maxLength={2} value={createFormData.state} onChange={handleCreateInputChange} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-postalCode">ZIP Code</Label>
+                  <Input id="create-postalCode" name="postalCode" value={createFormData.postalCode} onChange={handleCreateInputChange} />
+                </div>
+              </div>
+              <p className="text-xs text-zinc-500">First name + last name and at least one of email or phone are required.</p>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" onClick={closeCreateModal} disabled={isSubmitting}>Cancel</Button>
+                <Button type="submit" className="bg-sky-500 text-white hover:bg-sky-600" disabled={isSubmitting}>
+                  {isSubmitting ? 'Creating...' : 'Create Contact'}
+                </Button>
               </div>
             </form>
           </div>

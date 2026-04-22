@@ -3,7 +3,7 @@ import { apiRequest } from '@/lib/apiClient'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, FileText, CheckCircle, RefreshCw, X } from 'lucide-react'
+import { ClipboardList, FileText, CheckCircle, RefreshCw, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   buildLegacyQuoteContinueState,
@@ -309,51 +309,48 @@ function QuotesPage() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="ml-auto flex w-full max-w-xl flex-col items-end gap-2">
+            <div className="relative w-full">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search quotes..."
-                className="h-9 w-52 text-sm"
+                className="h-9 w-full pl-8 text-sm"
               />
             </div>
-          </div>
-        </div>
-
-        {/* Filter pills row */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-zinc-50/60 px-5 py-2.5">
-          {['all', 'draft', 'approved'].map((status) => (
-            <button
-              key={status}
-              type="button"
-              onClick={() => setStatusFilter(status)}
-              className={cn(
-                'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
-                statusFilter === status
-                  ? 'border-sky-500 bg-sky-500 text-white'
-                  : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100'
-              )}>
-              {status === 'all' ? 'All statuses' : status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
-          ))}
-          <div className="ml-auto flex items-center gap-2">
-            <select
-              className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none focus:border-zinc-400"
-              value={dateFilter}
-              onChange={(event) => setDateFilter(event.target.value)}>
-              <option value="all">All time</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-            </select>
-            {hasActiveFilters && (
-              <button
-                type="button"
-                className="text-xs font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-800"
-                onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
-                Clear filters
-              </button>
-            )}
+            <div className="flex w-full flex-wrap items-center justify-end gap-2">
+              {['all', 'draft', 'approved'].map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setStatusFilter(status)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
+                    statusFilter === status
+                      ? 'border-sky-500 bg-sky-500 text-white'
+                      : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100'
+                  )}>
+                  {status === 'all' ? 'All statuses' : status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              ))}
+              <select
+                className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none focus:border-zinc-400"
+                value={dateFilter}
+                onChange={(event) => setDateFilter(event.target.value)}>
+                <option value="all">All time</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+              </select>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-800"
+                  onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
+                  Clear filters
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -386,75 +383,108 @@ function QuotesPage() {
 
         {/* Table */}
         {!isLoading && filteredQuotes.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="border-b border-zinc-200 bg-white">
-                <tr>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Client</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Quote Title</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Price</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Jobber</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {filteredQuotes.map((quote, index) => (
-                  <tr
-                    key={`${quote.createdAt}-${index}`}
-                    className="cursor-pointer transition-colors hover:bg-zinc-50"
-                    onClick={() => openQuoteDetail(quote.id)}>
-                    <td className="px-5 py-3.5 text-sm font-semibold text-zinc-900">{quote.client}</td>
-                    <td className="max-w-[400px] px-5 py-3.5">
-                      <p className="line-clamp-1 text-sm font-medium text-zinc-900">{quote.title}</p>
-                      {quote.quoteDescription ? (
-                        <p className="line-clamp-1 text-xs text-zinc-500">{quote.quoteDescription}</p>
-                      ) : null}
-                    </td>
-                    <td className="px-5 py-3.5 text-sm font-medium text-zinc-900">
-                      {formatMoneyFromCents(quote.amountCents)}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
-                        quote.status === 'draft'
-                          ? 'border-amber-200 bg-amber-50 text-amber-700'
-                          : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      )}>
-                        <span className={cn('h-1.5 w-1.5 rounded-full', quote.status === 'draft' ? 'bg-amber-400' : 'bg-emerald-500')} />
-                        {quote.status === 'draft' ? 'Draft' : 'Approved'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-xs">
-                      {quote.jobberSyncStatus === 'synced' ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Synced
-                        </span>
-                      ) : quote.jobberSyncStatus === 'failed' ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-red-400" />Failed
-                        </span>
-                      ) : jobberReadinessByQuoteId[quote.id]?.ready ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />Ready
-                        </span>
-                      ) : quote.status === 'approved' ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />Pending
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-500">
-                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />N/A
-                        </span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-sm text-zinc-500">
-                      {formatRelativeTime(quote.createdAt)}
-                    </td>
+          <div>
+            <div className="divide-y divide-zinc-100 md:hidden">
+              {filteredQuotes.map((quote) => (
+                <button
+                  key={`${quote.createdAt}-${quote.id || quote.title}`}
+                  type="button"
+                  className="w-full px-4 py-3 text-left transition-colors hover:bg-zinc-50"
+                  onClick={() => openQuoteDetail(quote.id)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-zinc-900">{quote.client || '—'}</p>
+                      <p className="truncate text-sm font-medium text-zinc-700">{quote.title || 'Untitled quote'}</p>
+                    </div>
+                    <span className={cn(
+                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+                      quote.status === 'draft'
+                        ? 'border-amber-200 bg-amber-50 text-amber-700'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    )}>
+                      <span className={cn('h-1.5 w-1.5 rounded-full', quote.status === 'draft' ? 'bg-amber-400' : 'bg-emerald-500')} />
+                      {quote.status === 'draft' ? 'Draft' : 'Approved'}
+                    </span>
+                  </div>
+                  {quote.quoteDescription ? <p className="mt-1 line-clamp-2 text-sm text-zinc-600">{quote.quoteDescription}</p> : null}
+                  <div className="mt-2 flex items-center justify-between">
+                    <p className="text-sm font-medium text-zinc-900">{formatMoneyFromCents(quote.amountCents)}</p>
+                    <p className="text-sm text-zinc-500">{formatRelativeTime(quote.createdAt)}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="min-w-full">
+                <thead className="border-b border-zinc-200 bg-white">
+                  <tr>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Client</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Quote Title</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Price</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Jobber</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Created</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {filteredQuotes.map((quote, index) => (
+                    <tr
+                      key={`${quote.createdAt}-${index}`}
+                      className="cursor-pointer transition-colors hover:bg-zinc-50"
+                      onClick={() => openQuoteDetail(quote.id)}>
+                      <td className="px-5 py-3.5 text-sm font-semibold text-zinc-900">{quote.client}</td>
+                      <td className="max-w-[400px] px-5 py-3.5">
+                        <p className="line-clamp-1 text-sm font-medium text-zinc-900">{quote.title}</p>
+                        {quote.quoteDescription ? (
+                          <p className="line-clamp-1 text-xs text-zinc-500">{quote.quoteDescription}</p>
+                        ) : null}
+                      </td>
+                      <td className="px-5 py-3.5 text-sm font-medium text-zinc-900">
+                        {formatMoneyFromCents(quote.amountCents)}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={cn(
+                          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+                          quote.status === 'draft'
+                            ? 'border-amber-200 bg-amber-50 text-amber-700'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        )}>
+                          <span className={cn('h-1.5 w-1.5 rounded-full', quote.status === 'draft' ? 'bg-amber-400' : 'bg-emerald-500')} />
+                          {quote.status === 'draft' ? 'Draft' : 'Approved'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-xs">
+                        {quote.jobberSyncStatus === 'synced' ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Synced
+                          </span>
+                        ) : quote.jobberSyncStatus === 'failed' ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-red-400" />Failed
+                          </span>
+                        ) : jobberReadinessByQuoteId[quote.id]?.ready ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />Ready
+                          </span>
+                        ) : quote.status === 'approved' ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />Pending
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-500">
+                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />N/A
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-sm text-zinc-500">
+                        {formatRelativeTime(quote.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

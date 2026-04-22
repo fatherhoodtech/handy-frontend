@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   ListFilter,
   Mail,
+  Menu,
   Package,
   Settings,
   Trash2,
@@ -109,6 +110,8 @@ function DashboardPage() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [notificationError, setNotificationError] = useState('')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
   const notificationPanelRef = useRef(null)
 
   const location = useLocation()
@@ -140,6 +143,18 @@ function DashboardPage() {
   const pageHeading = pageTitle === 'Quotes' ? 'Quote' : pageTitle
   const pageSubtitle =
     pageTitle === 'Quotes' ? 'Track drafts and approvals for sales follow-up.' : ''
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const syncSidebarForViewport = () => {
+      const desktop = window.matchMedia('(min-width: 1024px)').matches
+      setIsDesktop(desktop)
+      setIsSidebarOpen(desktop ? true : false)
+    }
+    syncSidebarForViewport()
+    window.addEventListener('resize', syncSidebarForViewport)
+    return () => window.removeEventListener('resize', syncSidebarForViewport)
+  }, [])
   useEffect(() => {
     if (!isNotificationsOpen) return
     function handleClickOutside(event) {
@@ -213,8 +228,20 @@ function DashboardPage() {
 
   return (
     <main className="theme h-screen overflow-hidden bg-[#f5f1eb] text-zinc-900">
-      <div className="grid h-full w-full overflow-hidden bg-white lg:grid-cols-[250px_1fr]">
-        <aside className="border-b border-zinc-200 bg-zinc-50/70 p-5 lg:border-b-0 lg:border-r">
+      <div className="relative flex h-full w-full overflow-hidden bg-white">
+        {!isDesktop && isSidebarOpen && (
+          <button
+            type="button"
+            aria-label="Close sidebar overlay"
+            className="absolute inset-0 z-20 bg-black/30 lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+        <aside
+          className={cn(
+            'absolute inset-y-0 left-0 z-30 w-[250px] border-r border-zinc-200 bg-zinc-50/70 p-5 transition-transform lg:relative lg:z-10 lg:translate-x-0',
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          )}>
           <p className="mb-6 text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Handy Dudes</p>
           <div className="mb-6 rounded-2xl border border-zinc-200 bg-white p-4 text-center">
             <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">
@@ -251,6 +278,18 @@ function DashboardPage() {
           <div className="mb-6 mt-10">
             <div className="flex items-start justify-between gap-3">
               <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsSidebarOpen((current) => !current)}
+                    aria-label={isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+                    title={isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+                    className="lg:hidden">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </div>
                 <h1 className="text-3xl font-bold tracking-tight">{pageHeading}</h1>
                 {pageSubtitle && <p className="mt-1 text-zinc-500">{pageSubtitle}</p>}
               </div>

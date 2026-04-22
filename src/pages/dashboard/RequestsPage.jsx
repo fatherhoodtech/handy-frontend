@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
-import { X } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
 
 const STATUS_CONFIG = {
   new:        { label: 'New',        dot: 'bg-blue-500',   text: 'text-blue-700',   bg: 'bg-blue-50'   },
@@ -30,14 +30,27 @@ function formatRequested(value) {
   if (!value) return '—'
   try {
     const d = new Date(value)
-    const today = new Date()
-    const isToday =
-      d.getFullYear() === today.getFullYear() &&
-      d.getMonth() === today.getMonth() &&
-      d.getDate() === today.getDate()
-    return isToday
-      ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-      : d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+    const time = d.getTime()
+    if (!Number.isFinite(time)) return '—'
+    const diffMs = Math.max(0, Date.now() - time)
+    const minute = 60 * 1000
+    const hour = 60 * minute
+    const day = 24 * hour
+
+    if (diffMs < minute) return 'just now'
+    if (diffMs < hour) {
+      const mins = Math.floor(diffMs / minute)
+      return `${mins} min${mins === 1 ? '' : 's'} ago`
+    }
+    if (diffMs < day) {
+      const hours = Math.floor(diffMs / hour)
+      return `${hours} hr${hours === 1 ? '' : 's'} ago`
+    }
+    if (diffMs < 7 * day) {
+      const days = Math.floor(diffMs / day)
+      return `${days} day${days === 1 ? '' : 's'} ago`
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
   } catch {
     return value
   }
@@ -380,13 +393,6 @@ function RequestsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <Button type="button" className="bg-zinc-900 text-white hover:bg-zinc-800" onClick={openManualCreateForm}>
-          Create request
-        </Button>
-      </div>
-
       {/* Overview stat cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-zinc-200 bg-white p-4">
@@ -451,12 +457,17 @@ function RequestsPage() {
             </button>
           </div>
         </div>
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search requests..."
-          className="w-56"
-        />
+        <div className="flex items-center gap-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search requests..."
+            className="w-56"
+          />
+          <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" onClick={openManualCreateForm}>
+            Create request
+          </Button>
+        </div>
       </div>
 
       {errorMessage && (
@@ -481,67 +492,121 @@ function RequestsPage() {
             No requests found.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-100 text-sm">
-              <thead>
-                <tr className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                  <th className="px-4 py-3">Client</th>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Property</th>
-                  <th className="px-4 py-3">Contact</th>
-                  <th className="px-4 py-3">Requested</th>
-                  <th className="px-4 py-3 text-right">AI quote</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {filtered.map((item) => (
-                  <tr
+          <div>
+            <div className="divide-y divide-zinc-100 md:hidden">
+              {filtered.map((item, index) => {
+                const usePrimaryTone = index % 2 === 0
+                const buttonToneClass = usePrimaryTone
+                  ? 'border-sky-200 bg-sky-50 text-sky-600 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-700'
+                  : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-700'
+                return (
+                  <button
                     key={item.id}
-                    className="group cursor-pointer hover:bg-zinc-50"
+                    type="button"
+                    className="w-full px-4 py-3 text-left transition-colors hover:bg-zinc-50"
                     onClick={() => setSelected(item)}>
-                    {/* Client */}
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-zinc-900">{item.name || '—'}</div>
-                      {item.companyName ? (
-                        <div className="text-xs text-zinc-400">{item.companyName}</div>
-                      ) : null}
-                    </td>
-                    {/* Title */}
-                    <td className="px-4 py-3 text-zinc-700 max-w-[180px] truncate">
-                      {item.title || '—'}
-                    </td>
-                    {/* Property */}
-                    <td className="px-4 py-3 text-zinc-500 text-xs max-w-[160px]">
-                      {[item.city, item.state, item.postalCode].filter(Boolean).join(', ') || '—'}
-                    </td>
-                    {/* Contact */}
-                    <td className="px-4 py-3">
-                      {item.phone ? (
-                        <div className="text-zinc-700">{item.phone}</div>
-                      ) : null}
-                      {item.email ? (
-                        <div className="text-xs text-zinc-400">{item.email}</div>
-                      ) : null}
-                      {!item.phone && !item.email ? <span className="text-zinc-400">—</span> : null}
-                    </td>
-                    {/* Requested */}
-                    <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">
-                      {formatRequested(item.createdAt)}
-                    </td>
-                    {/* AI action */}
-                    <td className="px-4 py-3 text-right">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-zinc-900">{item.name || '—'}</p>
+                        {item.companyName ? <p className="truncate text-sm text-zinc-500">{item.companyName}</p> : null}
+                      </div>
+                      <StatusBadge status={item.status} />
+                    </div>
+                    {item.title ? <p className="mt-2 text-sm font-medium text-zinc-800">{item.title}</p> : null}
+                    <p className="mt-1 text-sm text-zinc-600">
+                      {[item.addressLine1, item.city, item.state, item.postalCode].filter(Boolean).join(', ') || '—'}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-700">{item.phone || '—'}</p>
+                    {item.email ? <p className="text-sm text-zinc-500">{item.email}</p> : null}
+                    <div className="mt-2 flex items-center justify-between">
+                      <p className="text-sm text-zinc-500">{formatRequested(item.createdAt)}</p>
                       <Button
                         type="button"
                         size="sm"
-                        className="whitespace-nowrap text-xs font-medium bg-sky-500 text-white hover:bg-sky-600 shadow-sm"
-                        onClick={(e) => handleContinueWithAI(item, e)}>
-                        Continue with AI
+                        className={`h-8 w-8 border p-0 shadow-sm transition-colors ${buttonToneClass}`}
+                        onClick={(e) => handleContinueWithAI(item, e)}
+                        aria-label="Continue with AI"
+                        title="Continue with AI">
+                        <Sparkles className="h-4 w-4" />
                       </Button>
-                    </td>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="min-w-full divide-y divide-zinc-100 text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                    <th className="px-4 py-3">Client</th>
+                    <th className="px-4 py-3">Title</th>
+                    <th className="px-4 py-3">Property</th>
+                    <th className="px-4 py-3">Contact</th>
+                    <th className="px-4 py-3">Requested</th>
+                    <th className="px-4 py-3 text-right">AI quote</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {filtered.map((item, index) => (
+                    <tr
+                      key={item.id}
+                      className="group cursor-pointer hover:bg-zinc-50"
+                      onClick={() => setSelected(item)}>
+                      {/* Client */}
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-zinc-900">{item.name || '—'}</div>
+                        {item.companyName ? (
+                          <div className="text-xs text-zinc-400">{item.companyName}</div>
+                        ) : null}
+                      </td>
+                      {/* Title */}
+                      <td className="px-4 py-3 text-zinc-700 max-w-[180px] truncate">
+                        {item.title || '—'}
+                      </td>
+                      {/* Property */}
+                      <td className="px-4 py-3 text-zinc-500 text-xs max-w-[160px]">
+                        {[item.city, item.state, item.postalCode].filter(Boolean).join(', ') || '—'}
+                      </td>
+                      {/* Contact */}
+                      <td className="px-4 py-3">
+                        {item.phone ? (
+                          <div className="text-zinc-700">{item.phone}</div>
+                        ) : null}
+                        {item.email ? (
+                          <div className="text-xs text-zinc-400">{item.email}</div>
+                        ) : null}
+                        {!item.phone && !item.email ? <span className="text-zinc-400">—</span> : null}
+                      </td>
+                      {/* Requested */}
+                      <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">
+                        {formatRequested(item.createdAt)}
+                      </td>
+                      {/* AI action */}
+                      <td className="px-4 py-3 text-right">
+                        {(() => {
+                          const usePrimaryTone = index % 2 === 0
+                          const buttonToneClass = usePrimaryTone
+                            ? 'border-sky-200 bg-sky-50 text-sky-600 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-700'
+                            : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-700'
+                          return (
+                            <Button
+                              type="button"
+                              size="sm"
+                              className={`h-8 w-8 border p-0 shadow-sm transition-colors ${buttonToneClass}`}
+                              onClick={(e) => handleContinueWithAI(item, e)}
+                              aria-label="Continue with AI"
+                              title="Continue with AI">
+                              <Sparkles className="h-4 w-4" />
+                            </Button>
+                          )
+                        })()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
