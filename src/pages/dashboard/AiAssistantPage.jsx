@@ -1815,10 +1815,20 @@ function AiAssistantPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="icon" onClick={() => setHistoryOpen(true)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+                onClick={() => setHistoryOpen(true)}>
                 <History className="h-4 w-4" />
               </Button>
-              <Button type="button" variant="outline" onClick={handleNewChat} disabled={isCreatingNewChat}>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+                onClick={handleNewChat}
+                disabled={isCreatingNewChat}>
                 {isCreatingNewChat ? 'Creating...' : 'New Chat'}
               </Button>
             </div>
