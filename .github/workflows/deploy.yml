@@ -3,6 +3,7 @@ name: Deploy Frontend
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -24,14 +25,24 @@ jobs:
       - name: Build
         run: npm run build -- --mode production
         env:
-          VITE_API_BASE_URL: https://handy.us.eqv.rw
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+
+      - name: Clear previous dist on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            set -e
+            mkdir -p /root/handy-frontend/dist
+            rm -rf /root/handy-frontend/dist/*
 
       - name: Upload dist to droplet
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: handy.us.eqv.rw
-          username: root
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
-          source: dist/
-          target: /root/handy-frontend/
-          strip_components: 0
+          source: dist/*
+          target: /root/handy-frontend/dist/
