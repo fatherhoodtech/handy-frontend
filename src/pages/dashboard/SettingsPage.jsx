@@ -124,9 +124,9 @@ function SettingsPage() {
   }
 
   return (
-    <div className="flex min-h-0 gap-6">
-      <aside className="w-48 shrink-0">
-        <nav className="space-y-1">
+    <div className="space-y-4">
+      <div className="overflow-x-auto">
+        <nav className="flex min-w-max flex-wrap items-center gap-2">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -136,7 +136,7 @@ function SettingsPage() {
                 clearMessages()
               }}
               className={cn(
-                'flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors',
+                'inline-flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors',
                 activeTab === tab.id
                   ? 'border-sky-500 bg-sky-500 text-white'
                   : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-100'
@@ -146,9 +146,9 @@ function SettingsPage() {
             </button>
           ))}
         </nav>
-      </aside>
+      </div>
 
-      <div className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white p-6">
+      <div className="min-w-0 rounded-xl border border-zinc-200 bg-white p-6">
         {error && (
           <div className="mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
