@@ -910,7 +910,9 @@ function RequestsPage() {
 
       {showManualForm ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setShowManualForm(false)}>
-          <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4 shadow-xl sm:p-5"
+            onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-zinc-900">{manualForm.id ? 'Update request' : 'Create request'}</h3>
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input placeholder="Title" value={manualForm.title} onChange={(e) => setManualForm((p) => ({ ...p, title: e.target.value }))} />
@@ -918,7 +920,7 @@ function RequestsPage() {
               <div className="sm:col-span-2">
                 <Input placeholder="Search client..." value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} />
                 <select
-                  className="mt-2 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                  className="mt-2 h-10 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
                   value={manualForm.leadId}
                   onChange={(e) => setManualForm((p) => ({ ...p, leadId: e.target.value }))}>
                   <option value="">Select client in system</option>
@@ -932,7 +934,7 @@ function RequestsPage() {
               </div>
               <Input type="date" value={manualForm.requestedOn} onChange={(e) => setManualForm((p) => ({ ...p, requestedOn: e.target.value }))} />
               <select
-                className="rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                className="h-10 rounded-md border border-zinc-200 px-3 py-2 text-sm"
                 value={manualForm.salesUserId}
                 onChange={(e) => setManualForm((p) => ({ ...p, salesUserId: e.target.value }))}>
                 <option value="">Assign salesperson</option>
@@ -965,7 +967,7 @@ function RequestsPage() {
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Upload images</p>
                 <Input type="file" accept="image/*" multiple onChange={handleImageUpload} />
                 {manualForm.images.length ? (
-                  <ul className="mt-2 space-y-1 text-xs text-zinc-600">
+                  <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto text-xs text-zinc-600">
                     {manualForm.images.map((img, idx) => <li key={`${img.name}-${idx}`}>{img.name}</li>)}
                   </ul>
                 ) : null}
@@ -977,7 +979,7 @@ function RequestsPage() {
                 onChange={(e) => setManualForm((p) => ({ ...p, internalNote: e.target.value }))}
               />
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="sticky bottom-0 mt-4 flex justify-end gap-2 border-t border-zinc-100 bg-white pt-3">
               <Button type="button" variant="outline" onClick={() => setShowManualForm(false)}>Cancel</Button>
               <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" disabled={isSavingManual} onClick={handleSaveManualRequest}>
                 {isSavingManual ? 'Saving...' : manualForm.id ? 'Update request' : 'Create request'}

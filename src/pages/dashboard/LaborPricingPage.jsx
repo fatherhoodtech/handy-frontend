@@ -26,6 +26,7 @@ export default function LaborPricingPage() {
   const [sortBy, setSortBy] = useState('trade-asc')
   const [showCreate, setShowCreate] = useState(false)
   const [editingRow, setEditingRow] = useState(null)
+  const [selectedRow, setSelectedRow] = useState(null)
   const [laborForm, setLaborForm] = useState({ trade: '', expertiseLevel: 'standard', hourlyRateDollars: '' })
 
   const filteredLabor = useMemo(() => {
@@ -104,21 +105,6 @@ export default function LaborPricingPage() {
     }
   }
 
-  async function toggleLaborActive(row) {
-    try {
-      clearMessages()
-      const response = await apiRequest(`/api/sales/settings/labor-pricing/${row.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ active: !row.active }),
-      })
-      const item = response?.item
-      if (item) setLaborItems((current) => current.map((e) => (e.id === item.id ? item : e)))
-      setNotice('Labor pricing updated.')
-    } catch (err) {
-      setError(err?.message || 'Failed to update labor row')
-    }
-  }
-
   async function updateLaborRow() {
     if (!editingRow) return
     try {
@@ -149,6 +135,22 @@ export default function LaborPricingPage() {
       hourlyRateDollars: centsToDollars(row.hourlyRateCents),
       active: row.active,
     })
+  }
+
+  function openDetailModal(row) {
+    setSelectedRow(row)
+  }
+
+  async function deleteLaborRow(id) {
+    try {
+      clearMessages()
+      await apiRequest(`/api/sales/settings/labor-pricing/${id}`, { method: 'DELETE' })
+      setLaborItems((current) => current.filter((row) => row.id !== id))
+      setSelectedRow(null)
+      setNotice('Labor row deleted.')
+    } catch (err) {
+      setError(err?.message || 'Failed to delete labor row')
+    }
   }
 
   return (
@@ -210,7 +212,7 @@ export default function LaborPricingPage() {
               <option value="rate-desc">Sort: Rate High-Low</option>
             </select>
             </div>
-            <Button type="button" className="bg-zinc-900 text-white hover:bg-zinc-800" onClick={() => setShowCreate(true)}>
+            <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" onClick={() => setShowCreate(true)}>
               Create labor rate
             </Button>
           </div>
@@ -221,7 +223,7 @@ export default function LaborPricingPage() {
                   {laborItems.length === 0 ? 'No labor rates yet. Create one above.' : 'No rows match current filters.'}
                 </div>
               ) : filteredLabor.map((row) => (
-                <div key={row.id} className="px-4 py-3">
+                <button key={row.id} type="button" className="w-full px-4 py-3 text-left hover:bg-zinc-50" onClick={() => openDetailModal(row)}>
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-zinc-900">{row.trade}</p>
@@ -238,30 +240,7 @@ export default function LaborPricingPage() {
                     </span>
                   </div>
                   <p className="mt-1 text-sm font-medium text-zinc-900">${centsToDollars(row.hourlyRateCents)}/hr</p>
-                  <div className="mt-2 flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
-                      onClick={() => openUpdateModal(row)}>
-                      Update
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        'flex-1',
-                        row.active
-                          ? 'border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50'
-                          : 'border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50'
-                      )}
-                      onClick={() => toggleLaborActive(row)}>
-                      {row.active ? 'Deactivate' : 'Activate'}
-                    </Button>
-                  </div>
-                </div>
+                </button>
               ))}
             </div>
 
@@ -273,18 +252,17 @@ export default function LaborPricingPage() {
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Expertise</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Hourly Rate</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
-                    <th className="px-5 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {filteredLabor.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-5 py-8 text-center text-sm text-zinc-400">
+                      <td colSpan={4} className="px-5 py-8 text-center text-sm text-zinc-400">
                         {laborItems.length === 0 ? 'No labor rates yet. Create one above.' : 'No rows match current filters.'}
                       </td>
                     </tr>
                   ) : filteredLabor.map((row) => (
-                    <tr key={row.id} className="hover:bg-zinc-50">
+                    <tr key={row.id} className="cursor-pointer hover:bg-zinc-50" onClick={() => openDetailModal(row)}>
                       <td className="px-5 py-3 text-sm font-medium text-zinc-900">{row.trade}</td>
                       <td className="px-5 py-3 text-sm text-zinc-600 capitalize">{row.expertiseLevel}</td>
                       <td className="px-5 py-3 text-sm font-medium text-zinc-900">${centsToDollars(row.hourlyRateCents)}/hr</td>
@@ -299,31 +277,6 @@ export default function LaborPricingPage() {
                           {row.active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right">
-                        <div className="inline-flex min-w-[190px] justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-24 border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
-                            onClick={() => openUpdateModal(row)}>
-                            Update
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className={cn(
-                              'w-24',
-                              row.active
-                                ? 'border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50'
-                                : 'border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50'
-                            )}
-                            onClick={() => toggleLaborActive(row)}>
-                            {row.active ? 'Deactivate' : 'Activate'}
-                          </Button>
-                        </div>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -332,7 +285,7 @@ export default function LaborPricingPage() {
           </div>
           {showCreate ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setShowCreate(false)}>
-              <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4 shadow-xl sm:p-5" onClick={(e) => e.stopPropagation()}>
                 <h3 className="text-lg font-semibold text-zinc-900">Create labor rate</h3>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <Input
@@ -357,6 +310,7 @@ export default function LaborPricingPage() {
                   <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
                   <Button
                     type="button"
+                    className="bg-sky-500 text-white hover:bg-sky-600"
                     onClick={async () => {
                       await createLaborRow()
                       setShowCreate(false)
@@ -369,7 +323,7 @@ export default function LaborPricingPage() {
           ) : null}
           {editingRow ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setEditingRow(null)}>
-              <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4 shadow-xl sm:p-5" onClick={(e) => e.stopPropagation()}>
                 <h3 className="text-lg font-semibold text-zinc-900">Update labor rate</h3>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
                   <Input
@@ -401,10 +355,40 @@ export default function LaborPricingPage() {
                   <Button type="button" variant="outline" onClick={() => setEditingRow(null)}>Cancel</Button>
                   <Button
                     type="button"
+                    className="bg-sky-500 text-white hover:bg-sky-600"
                     onClick={async () => {
                       await updateLaborRow()
                     }}>
                     Save
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {selectedRow ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setSelectedRow(null)}>
+              <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-4 shadow-xl sm:p-5" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-semibold text-zinc-900">{selectedRow.trade}</h3>
+                <p className="mt-1 text-sm capitalize text-zinc-600">{selectedRow.expertiseLevel}</p>
+                <p className="mt-1 text-sm font-medium text-zinc-900">${centsToDollars(selectedRow.hourlyRateCents)}/hr</p>
+                <p className="mt-2 text-sm text-zinc-600">Status: {selectedRow.active ? 'Active' : 'Inactive'}</p>
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+                    onClick={() => {
+                      openUpdateModal(selectedRow)
+                      setSelectedRow(null)
+                    }}>
+                    Update
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-red-200 text-red-700 hover:bg-red-50"
+                    onClick={() => deleteLaborRow(selectedRow.id)}>
+                    Delete
                   </Button>
                 </div>
               </div>

@@ -27,6 +27,7 @@ export default function MaterialsCatalogPage() {
   const [sortBy, setSortBy] = useState('name-asc')
   const [showCreate, setShowCreate] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
+  const [selectedItem, setSelectedItem] = useState(null)
 
   const filteredCatalog = useMemo(() => {
     const q = materialsSearch.trim().toLowerCase()
@@ -102,21 +103,6 @@ export default function MaterialsCatalogPage() {
     }
   }
 
-  async function toggleCatalogActive(item) {
-    try {
-      clearMessages()
-      const response = await apiRequest(`/api/sales/settings/materials-catalog/${item.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ active: !item.active }),
-      })
-      const next = response?.item
-      if (next) setCatalogItems((current) => current.map((row) => (row.id === next.id ? next : row)))
-      setNotice('Catalog item updated.')
-    } catch (err) {
-      setError(err?.message || 'Failed to update catalog item')
-    }
-  }
-
   async function updateCatalogItem() {
     if (!editingItem) return
     try {
@@ -147,6 +133,22 @@ export default function MaterialsCatalogPage() {
       priceDollars: centsToDollars(item.price_cents),
       active: item.active,
     })
+  }
+
+  function openDetailModal(item) {
+    setSelectedItem(item)
+  }
+
+  async function deleteCatalogItem(id) {
+    try {
+      clearMessages()
+      await apiRequest(`/api/sales/settings/materials-catalog/${id}`, { method: 'DELETE' })
+      setCatalogItems((current) => current.filter((row) => row.id !== id))
+      setSelectedItem(null)
+      setNotice('Catalog item deleted.')
+    } catch (err) {
+      setError(err?.message || 'Failed to delete catalog item')
+    }
   }
 
   return (
@@ -211,7 +213,7 @@ export default function MaterialsCatalogPage() {
               <option value="uom-desc">Sort: UOM Z-A</option>
             </select>
             </div>
-            <Button type="button" className="bg-zinc-900 text-white hover:bg-zinc-800" onClick={() => setShowCreate(true)}>
+            <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" onClick={() => setShowCreate(true)}>
               Create material
             </Button>
           </div>
@@ -222,7 +224,7 @@ export default function MaterialsCatalogPage() {
                   {catalogItems.length === 0 ? 'No materials yet. Add one above.' : 'No results match your search.'}
                 </div>
               ) : filteredCatalog.map((item) => (
-                <div key={item.id} className="px-4 py-3">
+                <button key={item.id} type="button" className="w-full px-4 py-3 text-left hover:bg-zinc-50" onClick={() => openDetailModal(item)}>
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-zinc-900">{item.materials}</p>
@@ -239,30 +241,7 @@ export default function MaterialsCatalogPage() {
                     </span>
                   </div>
                   <p className="mt-1 text-sm font-medium text-zinc-900">${centsToDollars(item.price_cents)}</p>
-                  <div className="mt-2 flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
-                      onClick={() => openUpdateModal(item)}>
-                      Update
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        'flex-1',
-                        item.active
-                          ? 'border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50'
-                          : 'border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50'
-                      )}
-                      onClick={() => toggleCatalogActive(item)}>
-                      {item.active ? 'Deactivate' : 'Activate'}
-                    </Button>
-                  </div>
-                </div>
+                </button>
               ))}
             </div>
 
@@ -274,18 +253,17 @@ export default function MaterialsCatalogPage() {
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">UOM</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Price</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
-                    <th className="px-5 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {filteredCatalog.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-5 py-8 text-center text-sm text-zinc-400">
+                      <td colSpan={4} className="px-5 py-8 text-center text-sm text-zinc-400">
                         {catalogItems.length === 0 ? 'No materials yet. Add one above.' : 'No results match your search.'}
                       </td>
                     </tr>
                   ) : filteredCatalog.map((item) => (
-                    <tr key={item.id} className="hover:bg-zinc-50">
+                    <tr key={item.id} className="cursor-pointer hover:bg-zinc-50" onClick={() => openDetailModal(item)}>
                       <td className="px-5 py-3 text-sm font-medium text-zinc-900">{item.materials}</td>
                       <td className="px-5 py-3 text-sm text-zinc-600">{item.uom}</td>
                       <td className="px-5 py-3 text-sm font-medium text-zinc-900">${centsToDollars(item.price_cents)}</td>
@@ -300,31 +278,6 @@ export default function MaterialsCatalogPage() {
                           {item.active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right">
-                        <div className="inline-flex min-w-[190px] justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-24 border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
-                            onClick={() => openUpdateModal(item)}>
-                            Update
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className={cn(
-                              'w-24',
-                              item.active
-                                ? 'border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50'
-                                : 'border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50'
-                            )}
-                            onClick={() => toggleCatalogActive(item)}>
-                            {item.active ? 'Deactivate' : 'Activate'}
-                          </Button>
-                        </div>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -333,7 +286,7 @@ export default function MaterialsCatalogPage() {
           </div>
           {showCreate ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setShowCreate(false)}>
-              <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4 shadow-xl sm:p-5" onClick={(e) => e.stopPropagation()}>
                 <h3 className="text-lg font-semibold text-zinc-900">Create material</h3>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <Input
@@ -356,6 +309,7 @@ export default function MaterialsCatalogPage() {
                   <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
                   <Button
                     type="button"
+                    className="bg-sky-500 text-white hover:bg-sky-600"
                     onClick={async () => {
                       await createCatalogRow()
                       setShowCreate(false)
@@ -368,7 +322,7 @@ export default function MaterialsCatalogPage() {
           ) : null}
           {editingItem ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setEditingItem(null)}>
-              <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4 shadow-xl sm:p-5" onClick={(e) => e.stopPropagation()}>
                 <h3 className="text-lg font-semibold text-zinc-900">Update material</h3>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
                   <Input
@@ -398,10 +352,40 @@ export default function MaterialsCatalogPage() {
                   <Button type="button" variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
                   <Button
                     type="button"
+                    className="bg-sky-500 text-white hover:bg-sky-600"
                     onClick={async () => {
                       await updateCatalogItem()
                     }}>
                     Save
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {selectedItem ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setSelectedItem(null)}>
+              <div className="w-full max-w-xl rounded-xl border border-zinc-200 bg-white p-4 shadow-xl sm:p-5" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-semibold text-zinc-900">{selectedItem.materials}</h3>
+                <p className="mt-1 text-sm text-zinc-600">UOM: {selectedItem.uom || '—'}</p>
+                <p className="mt-1 text-sm font-medium text-zinc-900">${centsToDollars(selectedItem.price_cents)}</p>
+                <p className="mt-2 text-sm text-zinc-600">Status: {selectedItem.active ? 'Active' : 'Inactive'}</p>
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+                    onClick={() => {
+                      openUpdateModal(selectedItem)
+                      setSelectedItem(null)
+                    }}>
+                    Update
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-red-200 text-red-700 hover:bg-red-50"
+                    onClick={() => deleteCatalogItem(selectedItem.id)}>
+                    Delete
                   </Button>
                 </div>
               </div>

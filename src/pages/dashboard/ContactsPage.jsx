@@ -614,7 +614,7 @@ function ContactsPage() {
                 <p className="mt-0.5 text-sm text-zinc-800">{new Date(selectedContactDetail.createdAt).toLocaleString()}</p>
               </div>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button type="button" onClick={() => openUpdateModal(selectedContactDetail)}>Edit Contact</Button>
               <Button type="button" variant="outline" onClick={() => openDeleteModal(selectedContactDetail)}>Delete Contact</Button>
             </div>
