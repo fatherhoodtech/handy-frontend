@@ -298,8 +298,8 @@ function QuotesPage() {
       <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
 
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4">
-          <div className="flex items-center gap-2.5">
+        <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-semibold text-zinc-900">
               {hasActiveFilters ? 'Filtered quotes' : 'All quotes'}
             </h2>
@@ -309,47 +309,41 @@ function QuotesPage() {
               </span>
             )}
           </div>
-          <div className="ml-auto flex w-full max-w-xl flex-col items-end gap-2">
-            <div className="relative w-full">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search quotes..."
-                className="h-9 w-full pl-8 text-sm"
-              />
-            </div>
-            <div className="flex w-full flex-wrap items-center justify-end gap-2">
-              {['all', 'draft', 'approved'].map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => setStatusFilter(status)}
-                  className={cn(
-                    'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
-                    statusFilter === status
-                      ? 'border-sky-500 bg-sky-500 text-white'
-                      : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100'
-                  )}>
-                  {status === 'all' ? 'All statuses' : status.charAt(0).toUpperCase() + status.slice(1)}
-                </button>
-              ))}
+          <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
+              <div className="relative min-w-[220px] flex-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search quotes..."
+                  className="h-9 w-full rounded-lg border-zinc-200 pl-8 text-sm"
+                />
+              </div>
               <select
-                className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none focus:border-zinc-400"
+                className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}>
+                <option value="all">All statuses</option>
+                <option value="draft">Draft</option>
+                <option value="approved">Approved</option>
+              </select>
+              <select
+                className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
                 value={dateFilter}
                 onChange={(event) => setDateFilter(event.target.value)}>
                 <option value="all">All time</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
               </select>
-              {hasActiveFilters && (
+              {hasActiveFilters ? (
                 <button
                   type="button"
-                  className="text-xs font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-800"
+                  className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
                   onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
-                  Clear filters
+                  Clear
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

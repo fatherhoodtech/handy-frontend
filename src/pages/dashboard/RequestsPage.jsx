@@ -241,6 +241,7 @@ function RequestsPage() {
     }
     return c
   }, [requests])
+  const hasActiveFilters = search.trim() || statusFilter !== 'all' || dateFilter !== 'all'
 
   async function handleContinueWithAI(item, event) {
     event?.stopPropagation()
@@ -428,62 +429,67 @@ function RequestsPage() {
         </div>
       </div>
 
-      {/* Filters row */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Status pill filters */}
-          <div className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white p-1">
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={`rounded px-3 py-1 text-sm font-medium transition-colors ${statusFilter === 'all' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}>
-              Status | All
-            </button>
+      {/* Table + toolbar */}
+      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-semibold text-zinc-900">
+              {hasActiveFilters ? 'Filtered requests' : 'All requests'}
+            </h2>
+            {!isLoading ? (
+              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
+                {filtered.length} {filtered.length === 1 ? 'result' : 'results'}
+              </span>
+            ) : null}
           </div>
-          <div className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white p-1">
-            <button
-              onClick={() => setDateFilter('all')}
-              className={`rounded px-3 py-1 text-sm font-medium transition-colors ${dateFilter === 'all' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}>
-              All dates
-            </button>
-            <button
-              onClick={() => setDateFilter('7d')}
-              className={`rounded px-3 py-1 text-sm font-medium transition-colors ${dateFilter === '7d' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}>
-              7 days
-            </button>
-            <button
-              onClick={() => setDateFilter('30d')}
-              className={`rounded px-3 py-1 text-sm font-medium transition-colors ${dateFilter === '30d' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}>
-              30 days
-            </button>
+          <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search requests..."
+                className="h-9 min-w-[220px] flex-1 rounded-lg border-zinc-200"
+              />
+              <select
+                className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="all">All statuses</option>
+                <option value="new">New</option>
+                <option value="contacted">Contacted</option>
+                <option value="qualified">Qualified</option>
+                <option value="quoted">Quoted</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
+              </select>
+              <select
+                className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}>
+                <option value="all">All time</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+              </select>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                  onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
+                  Clear
+                </button>
+              ) : null}
+            </div>
+            <Button type="button" className="h-9 bg-sky-500 text-white hover:bg-sky-600" onClick={openManualCreateForm}>
+              Create request
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search requests..."
-            className="w-56"
-          />
-          <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" onClick={openManualCreateForm}>
-            Create request
-          </Button>
-        </div>
-      </div>
 
-      {errorMessage && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {errorMessage}
-        </p>
-      )}
-
-      {/* Table */}
-      <div className="rounded-lg border border-zinc-200 bg-white">
-        <div className="border-b border-zinc-100 px-4 py-3">
-          <p className="text-sm font-medium text-zinc-700">
-            All requests{' '}
-            <span className="text-zinc-400">({filtered.length} results)</span>
-          </p>
-        </div>
+        {errorMessage && (
+          <div className="border-b border-red-100 bg-red-50 px-5 py-3">
+            <p className="text-sm text-red-700">{errorMessage}</p>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="px-4 py-8 text-center text-sm text-zinc-400">Loading requests…</div>
