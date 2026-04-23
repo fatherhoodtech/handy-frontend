@@ -404,8 +404,8 @@ function ContactsPage() {
       <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
 
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4">
-          <div className="flex items-center gap-2.5">
+        <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-semibold text-zinc-900">
               {hasActiveFilters ? 'Filtered contacts' : 'All contacts'}
             </h2>
@@ -415,40 +415,43 @@ function ContactsPage() {
               </span>
             )}
           </div>
-          <div className="ml-auto flex w-full max-w-xl flex-col items-end gap-2">
-            <div className="flex w-full items-center gap-2">
-              <div className="relative flex-1">
+          <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
+              <div className="relative min-w-[220px] flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search contacts..."
-                  className="h-9 w-full pl-8 text-sm"
+                  className="h-9 w-full rounded-lg border-zinc-200 pl-8 text-sm"
                 />
               </div>
-              <Button type="button" className="shrink-0 bg-sky-500 text-white hover:bg-sky-600" onClick={openCreateModal}>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                  value={dateFilter}
+                  onChange={(event) => setDateFilter(event.target.value)}>
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                </select>
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                    onClick={() => { setSearch(''); setDateFilter('all') }}>
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            <Button
+              type="button"
+              className="h-9 shrink-0 bg-sky-500 px-4 text-white hover:bg-sky-600"
+              onClick={openCreateModal}>
                 New Contact
-              </Button>
-            </div>
-            <div className="flex w-full items-center justify-end gap-2">
-              <select
-                className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs text-zinc-700 outline-none focus:border-zinc-400"
-                value={dateFilter}
-                onChange={(event) => setDateFilter(event.target.value)}>
-                <option value="all">All time</option>
-                <option value="today">Today</option>
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-              </select>
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  className="text-xs font-medium text-zinc-500 hover:text-zinc-800 underline underline-offset-2"
-                  onClick={() => { setSearch(''); setDateFilter('all') }}>
-                  Clear filters
-                </button>
-              )}
-            </div>
+            </Button>
           </div>
         </div>
 
@@ -656,7 +659,7 @@ function ContactsPage() {
           role="button"
           tabIndex={0}>
           <div
-            className="w-full max-w-3xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl"
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4 shadow-xl sm:p-5"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true">
@@ -665,7 +668,7 @@ function ContactsPage() {
               Update details for <span className="font-medium">{shortContactLabel(updateModalContact)}</span>.
             </p>
             <form onSubmit={handleSubmitUpdateContact} className="mt-4 space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="update-firstName">First Name</Label>
                   <Input id="update-firstName" name="firstName" value={updateFormData.firstName} onChange={handleUpdateInputChange} className={requiredInputClass('fullName')} required />
@@ -679,7 +682,7 @@ function ContactsPage() {
                   <Input id="update-lastName" name="lastName" value={updateFormData.lastName} onChange={handleUpdateInputChange} className={requiredInputClass('fullName')} required />
                 </div>
               </div>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="update-email">Email</Label>
                   <Input id="update-email" name="email" type="email" value={updateFormData.email} onChange={handleUpdateInputChange} className={requiredInputClass('phoneOrEmail')} />
@@ -697,7 +700,7 @@ function ContactsPage() {
                 <Label htmlFor="update-addressLine2">Address Line 2</Label>
                 <Input id="update-addressLine2" name="addressLine2" value={updateFormData.addressLine2} onChange={handleUpdateInputChange} />
               </div>
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="update-city">City</Label>
                   <Input id="update-city" name="city" value={updateFormData.city} onChange={handleUpdateInputChange} className={requiredInputClass('city')} />
@@ -716,7 +719,7 @@ function ContactsPage() {
                   Red bordered fields are required for Jobber sync.
                 </p>
               ) : null}
-              <div className="flex justify-end gap-2 pt-1">
+              <div className="sticky bottom-0 flex justify-end gap-2 border-t border-zinc-100 bg-white pt-3">
                 <Button type="button" variant="outline" onClick={closeUpdateModal} disabled={isSubmitting}>Cancel</Button>
                 <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Changes'}</Button>
               </div>
@@ -734,14 +737,14 @@ function ContactsPage() {
           role="button"
           tabIndex={0}>
           <div
-            className="w-full max-w-3xl rounded-xl border border-zinc-200 bg-white p-5 shadow-xl"
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4 shadow-xl sm:p-5"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true">
             <h3 className="text-base font-bold text-zinc-900">Create Contact</h3>
             <p className="mt-1 text-sm text-zinc-600">Add the client details needed for quotes and Jobber sync.</p>
             <form onSubmit={handleSubmitCreateContact} className="mt-4 space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="create-firstName">First Name</Label>
                   <Input id="create-firstName" name="firstName" value={createFormData.firstName} onChange={handleCreateInputChange} required />
@@ -755,7 +758,7 @@ function ContactsPage() {
                   <Input id="create-lastName" name="lastName" value={createFormData.lastName} onChange={handleCreateInputChange} required />
                 </div>
               </div>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="create-email">Email</Label>
                   <Input id="create-email" name="email" type="email" value={createFormData.email} onChange={handleCreateInputChange} />
@@ -773,7 +776,7 @@ function ContactsPage() {
                 <Label htmlFor="create-addressLine2">Address Line 2</Label>
                 <Input id="create-addressLine2" name="addressLine2" value={createFormData.addressLine2} onChange={handleCreateInputChange} />
               </div>
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="create-city">City</Label>
                   <Input id="create-city" name="city" value={createFormData.city} onChange={handleCreateInputChange} />
@@ -788,7 +791,7 @@ function ContactsPage() {
                 </div>
               </div>
               <p className="text-xs text-zinc-500">First name + last name and at least one of email or phone are required.</p>
-              <div className="flex justify-end gap-2 pt-1">
+              <div className="sticky bottom-0 flex justify-end gap-2 border-t border-zinc-100 bg-white pt-3">
                 <Button type="button" variant="outline" onClick={closeCreateModal} disabled={isSubmitting}>Cancel</Button>
                 <Button type="submit" className="bg-sky-500 text-white hover:bg-sky-600" disabled={isSubmitting}>
                   {isSubmitting ? 'Creating...' : 'Create Contact'}

@@ -1,19 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
 import { cn } from '@/lib/utils'
 import {
-  Bell,
   Building2,
   FileText,
+  Shield,
 } from 'lucide-react'
-
-const TABS = [
-  { id: 'account', label: 'Account', icon: Building2 },
-  { id: 'quote-defaults', label: 'Quote Defaults', icon: FileText },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-]
 
 function SectionHeader({ title, description }) {
   return (
@@ -35,16 +29,49 @@ function SettingsPage() {
     defaultTaxPercent: 0,
     defaultQuoteTerms: '',
   })
-  const [pushEnabled, setPushEnabled] = useState(false)
+  const [profile, setProfile] = useState({ id: '', email: '', role: '' })
+  const [profileEmailDraft, setProfileEmailDraft] = useState('')
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [users, setUsers] = useState([])
+  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'sales' })
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isSavingPassword, setIsSavingPassword] = useState(false)
+  const [isSavingUser, setIsSavingUser] = useState(false)
+
+  const tabs = useMemo(() => {
+    const base = [
+      { id: 'account', label: 'Account', icon: Building2 },
+      { id: 'quote-defaults', label: 'Quote Defaults', icon: FileText },
+    ]
+    if (profile.role === 'admin') {
+      base.push({ id: 'users', label: 'Users', icon: Shield })
+    }
+    return base
+  }, [profile.role])
 
   useEffect(() => {
     let cancelled = false
     async function loadSettings() {
       try {
         setIsLoading(true)
-        const settingsRes = await apiRequest('/api/sales/settings')
+        const [settingsRes, meRes] = await Promise.all([
+          apiRequest('/api/sales/settings'),
+          apiRequest('/auth/me'),
+        ])
         if (cancelled) return
         if (settingsRes?.quoteDefaults) setQuoteDefaults(settingsRes.quoteDefaults)
+        if (meRes?.user) {
+          setProfile({
+            id: String(meRes.user.id ?? ''),
+            email: String(meRes.user.email ?? ''),
+            role: String(meRes.user.role ?? ''),
+          })
+          setProfileEmailDraft(String(meRes.user.email ?? ''))
+          if (String(meRes.user.role ?? '') === 'admin') {
+            const usersRes = await apiRequest('/api/sales/users')
+            if (!cancelled) setUsers(Array.isArray(usersRes?.users) ? usersRes.users : [])
+          }
+        }
       } catch (err) {
         if (!cancelled) setError(err?.message || 'Failed to load settings')
       } finally {
@@ -79,47 +106,75 @@ function SettingsPage() {
     }
   }
 
-  async function handlePushToggle() {
+  async function saveProfile() {
     try {
       clearMessages()
-      if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-        setError('Push notifications are not supported in this browser.')
-        return
-      }
-      const registration = await navigator.serviceWorker.register('/sw.js')
-      if (!pushEnabled) {
-        const permission = await Notification.requestPermission()
-        if (permission !== 'granted') {
-          setError('Push notification permission was not granted.')
-          return
-        }
-        let sub = await registration.pushManager.getSubscription()
-        if (!sub) sub = await registration.pushManager.subscribe({ userVisibleOnly: true })
-        const payload = sub.toJSON()
-        await apiRequest('/api/sales/notifications/push-subscriptions', {
-          method: 'POST',
-          body: JSON.stringify({
-            endpoint: payload.endpoint,
-            p256dh: payload.keys?.p256dh || '',
-            auth: payload.keys?.auth || '',
-          }),
+      setIsSavingProfile(true)
+      const response = await apiRequest('/auth/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ email: profileEmailDraft.trim() }),
+      })
+      const user = response?.user
+      if (user) {
+        setProfile({
+          id: String(user.id ?? ''),
+          email: String(user.email ?? ''),
+          role: String(user.role ?? ''),
         })
-        setPushEnabled(true)
-        setNotice('Browser push notifications enabled.')
-        return
+        setProfileEmailDraft(String(user.email ?? ''))
       }
-      const sub = await registration.pushManager.getSubscription()
-      if (sub) {
-        await apiRequest('/api/sales/notifications/push-subscriptions', {
-          method: 'DELETE',
-          body: JSON.stringify({ endpoint: sub.endpoint }),
-        })
-        await sub.unsubscribe()
-      }
-      setPushEnabled(false)
-      setNotice('Browser push notifications disabled.')
+      setNotice('Profile updated.')
     } catch (err) {
-      setError(err?.message || 'Failed to update browser push setting')
+      setError(err?.message || 'Failed to update profile')
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
+
+  async function savePassword() {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError('New password and confirmation do not match.')
+      return
+    }
+    try {
+      clearMessages()
+      setIsSavingPassword(true)
+      await apiRequest('/auth/me/password', {
+        method: 'POST',
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      })
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setNotice('Password changed successfully.')
+    } catch (err) {
+      setError(err?.message || 'Failed to change password')
+    } finally {
+      setIsSavingPassword(false)
+    }
+  }
+
+  async function createUser() {
+    try {
+      clearMessages()
+      setIsSavingUser(true)
+      await apiRequest('/api/sales/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: newUser.email.trim(),
+          password: newUser.password,
+          role: newUser.role,
+        }),
+      })
+      setNewUser({ email: '', password: '', role: 'sales' })
+      const usersRes = await apiRequest('/api/sales/users')
+      setUsers(Array.isArray(usersRes?.users) ? usersRes.users : [])
+      setNotice('User created successfully.')
+    } catch (err) {
+      setError(err?.message || 'Failed to create user')
+    } finally {
+      setIsSavingUser(false)
     }
   }
 
@@ -127,7 +182,7 @@ function SettingsPage() {
     <div className="space-y-4">
       <div className="overflow-x-auto">
         <nav className="flex min-w-max flex-wrap items-center gap-2">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -138,7 +193,7 @@ function SettingsPage() {
               className={cn(
                 'inline-flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors',
                 activeTab === tab.id
-                  ? 'border-sky-500 bg-sky-500 text-white'
+                  ? 'border-sky-500 bg-sky-500 text-white shadow-sm'
                   : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-100'
               )}>
               <tab.icon className="h-4 w-4 shrink-0" />
@@ -166,35 +221,127 @@ function SettingsPage() {
 
         {activeTab === 'account' && (
           <div>
-            <SectionHeader
-              title="Account"
-              description="Business profile and system information for Handy Dudes."
-            />
-            <div className="mb-6 flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
-                <Building2 className="h-8 w-8" />
+            <SectionHeader title="Account" description="Manage your profile and security settings." />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+                <p className="text-sm font-semibold text-zinc-900">Profile Information</p>
+                <p className="mt-1 text-xs text-zinc-500">Keep your account profile up to date.</p>
+                <div className="mt-3 space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-zinc-600">Email</label>
+                    <Input
+                      value={profileEmailDraft}
+                      onChange={(e) => setProfileEmailDraft(e.target.value)}
+                      placeholder="name@company.com"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Role</p>
+                      <p className="text-sm text-zinc-900">{profile.role || '—'}</p>
+                    </div>
+                    <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">User ID</p>
+                      <p className="text-sm text-zinc-900">{profile.id || '—'}</p>
+                    </div>
+                  </div>
+                  <Button type="button" onClick={saveProfile} disabled={isSavingProfile}>
+                    {isSavingProfile ? 'Saving...' : 'Save Profile'}
+                  </Button>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-zinc-900">Handy Dudes</h3>
-                <p className="text-sm text-zinc-500">Home Services · Sales Quoting & Dispatch</p>
+              <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+                <p className="text-sm font-semibold text-zinc-900">Change Password</p>
+                <p className="mt-1 text-xs text-zinc-500">Use a strong password with at least 8 characters.</p>
+                <div className="mt-3 space-y-3">
+                  <Input
+                    type="password"
+                    placeholder="Current password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm((c) => ({ ...c, currentPassword: e.target.value }))}
+                  />
+                  <Input
+                    type="password"
+                    placeholder="New password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm((c) => ({ ...c, newPassword: e.target.value }))}
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm((c) => ({ ...c, confirmPassword: e.target.value }))}
+                  />
+                  <Button type="button" onClick={savePassword} disabled={isSavingPassword}>
+                    {isSavingPassword ? 'Saving...' : 'Change Password'}
+                  </Button>
+                </div>
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                { label: 'Company Name', value: 'Handy Dudes' },
-                { label: 'Industry', value: 'Home Services' },
-                { label: 'System', value: 'Sales Quoting & Dispatch' },
-                { label: 'Backend URL', value: 'https://handy.us.eqv.rw' },
-                { label: 'CRM Integration', value: 'GoHighLevel (GHL)' },
-                { label: 'Field Ops', value: 'Jobber' },
-                { label: 'Lead Source', value: 'Thumbtack · CallRail (see master plan)' },
-                { label: 'AI Engine', value: 'Anthropic Claude' },
-              ].map(({ label, value }) => (
-                <div key={label} className="rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{label}</p>
-                  <p className="mt-1 text-sm font-medium text-zinc-900">{value}</p>
-                </div>
-              ))}
+          </div>
+        )}
+
+        {activeTab === 'users' && profile.role === 'admin' && (
+          <div>
+            <SectionHeader title="Users" description="Admins can create and manage sales/admin accounts." />
+            <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+              <p className="text-sm font-semibold text-zinc-900">Create User</p>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
+                <Input
+                  placeholder="Email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser((c) => ({ ...c, email: e.target.value }))}
+                />
+                <Input
+                  type="password"
+                  placeholder="Temporary password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser((c) => ({ ...c, password: e.target.value }))}
+                />
+                <select
+                  className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800 outline-none focus:border-sky-400"
+                  value={newUser.role}
+                  onChange={(e) => setNewUser((c) => ({ ...c, role: e.target.value }))}>
+                  <option value="sales">Salesperson</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <Button type="button" onClick={createUser} disabled={isSavingUser}>
+                  {isSavingUser ? 'Creating...' : 'Create User'}
+                </Button>
+              </div>
+            </div>
+            <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200">
+              <table className="min-w-full">
+                <thead className="border-b border-zinc-200 bg-white">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Role</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Last Login</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 bg-white">
+                  {users.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-sm text-zinc-500">No users yet.</td>
+                    </tr>
+                  ) : users.map((u) => (
+                    <tr key={u.id}>
+                      <td className="px-4 py-3 text-sm text-zinc-900">{u.email}</td>
+                      <td className="px-4 py-3 text-sm capitalize text-zinc-700">{u.role}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={cn(
+                          'inline-flex rounded-full border px-2 py-0.5 text-xs font-medium',
+                          u.isActive ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-zinc-200 bg-zinc-50 text-zinc-500'
+                        )}>
+                          {u.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-zinc-600">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -249,36 +396,6 @@ function SettingsPage() {
           </div>
         )}
 
-        {activeTab === 'notifications' && (
-          <div>
-            <SectionHeader
-              title="Notifications"
-              description="Manage how and when you receive alerts from the system."
-            />
-            <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-5 py-4">
-                <div>
-                  <p className="text-sm font-semibold text-zinc-900">Browser Push Notifications</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    Receive real-time alerts in your browser even when the tab is in the background.
-                  </p>
-                </div>
-                <Button type="button" variant={pushEnabled ? 'outline' : 'default'} onClick={handlePushToggle}>
-                  {pushEnabled ? 'Disable' : 'Enable'}
-                </Button>
-              </div>
-              <div className="flex items-center justify-between rounded-xl border border-zinc-100 bg-zinc-50/50 px-5 py-4 opacity-60">
-                <div>
-                  <p className="text-sm font-semibold text-zinc-900">Email Notifications</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">Daily digest of quotes and pipeline activity.</p>
-                </div>
-                <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-0.5 text-xs font-medium text-zinc-400">
-                  Coming soon
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
