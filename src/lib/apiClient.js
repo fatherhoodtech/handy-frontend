@@ -74,17 +74,42 @@ async function tryRefreshAccessToken() {
   return refreshInFlight
 }
 
-async function parseApiError(response) {
+function normalizeHtmlError(raw) {
+  const text = String(raw || '').replace(/\s+/g, ' ').trim()
+  const cannotRouteMatch = text.match(/Cannot\s+(GET|POST|PATCH|PUT|DELETE)\s+([^\s<]+)/i)
+  if (!cannotRouteMatch) return ''
+  const method = cannotRouteMatch[1].toUpperCase()
+  const route = cannotRouteMatch[2]
+  return `The API route ${method} ${route} was not found in this environment. ` +
+    `This usually means the backend is not deployed/running the latest version or frontend API base URL is misconfigured.`
+}
+
+async function parseApiError(response, requestPath) {
   const raw = await response.text()
   let message = 'Request failed'
   try {
     const body = raw ? JSON.parse(raw) : {}
     message = body?.message || body?.error || message
   } catch {
-    if (response.status === 502 || response.status === 504) {
+    const htmlMessage = normalizeHtmlError(raw)
+    if (htmlMessage) {
+      message = htmlMessage
+    } else if (response.status === 404 && String(requestPath || '').startsWith('/api/')) {
+      message =
+        `API endpoint ${requestPath} returned 404. ` +
+        `Confirm backend deploy version and API routing/proxy configuration.`
+    } else if (response.status === 404 && String(requestPath || '').startsWith('/auth/')) {
+      message =
+        `Auth endpoint ${requestPath} returned 404. ` +
+        `Confirm backend auth routes are reachable from this environment.`
+    } else if (response.status === 502 || response.status === 504) {
       message =
         `Cannot reach the quote engine (HTTP ${response.status}). ` +
         `Start the API and ensure VITE_API_PROXY_TARGET matches its port (default http://127.0.0.1:8080).`
+    } else if (response.status >= 500) {
+      message =
+        `The server returned HTTP ${response.status}. ` +
+        `Check backend logs for the specific failure.`
     } else if (raw.trim().length > 0 && raw.length < 280) {
       message = raw.trim()
     }
@@ -97,12 +122,21 @@ async function parseApiError(response) {
 export async function apiRequest(path, options = {}, retried = false) {
   const { headers: optionHeaders, ...rest } = options
   const headers = buildHeaders(optionHeaders)
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: 'include',
-    headers,
-    ...rest,
-  })
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      credentials: 'include',
+      headers,
+      ...rest,
+    })
+  } catch {
+    const error = new Error(
+      `Network error while calling ${path}. ` +
+      `Ensure backend API is running/reachable and API base/proxy settings are correct.`
+    )
+    error.status = 0
+    throw error
+  }
 
   if (!response.ok) {
     if (response.status === 401 && !retried && !isAuthPath(path)) {
@@ -114,7 +148,7 @@ export async function apiRequest(path, options = {}, retried = false) {
       expired.status = 401
       throw expired
     }
-    await parseApiError(response)
+    await parseApiError(response, path)
   }
 
   if (response.status === 204) return null

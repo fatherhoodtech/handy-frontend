@@ -37,6 +37,7 @@ function SettingsPage() {
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingPassword, setIsSavingPassword] = useState(false)
   const [isSavingUser, setIsSavingUser] = useState(false)
+  const [usersLoadError, setUsersLoadError] = useState('')
 
   const tabs = useMemo(() => {
     const base = [
@@ -68,8 +69,18 @@ function SettingsPage() {
           })
           setProfileEmailDraft(String(meRes.user.email ?? ''))
           if (String(meRes.user.role ?? '') === 'admin') {
-            const usersRes = await apiRequest('/api/sales/users')
-            if (!cancelled) setUsers(Array.isArray(usersRes?.users) ? usersRes.users : [])
+            try {
+              const usersRes = await apiRequest('/api/sales/users')
+              if (!cancelled) {
+                setUsers(Array.isArray(usersRes?.users) ? usersRes.users : [])
+                setUsersLoadError('')
+              }
+            } catch (usersErr) {
+              if (!cancelled) {
+                setUsers([])
+                setUsersLoadError(usersErr?.message || 'Failed to load users list')
+              }
+            }
           }
         }
       } catch (err) {
@@ -170,6 +181,7 @@ function SettingsPage() {
       setNewUser({ email: '', password: '', role: 'sales' })
       const usersRes = await apiRequest('/api/sales/users')
       setUsers(Array.isArray(usersRes?.users) ? usersRes.users : [])
+      setUsersLoadError('')
       setNotice('User created successfully.')
     } catch (err) {
       setError(err?.message || 'Failed to create user')
@@ -284,6 +296,11 @@ function SettingsPage() {
         {activeTab === 'users' && profile.role === 'admin' && (
           <div>
             <SectionHeader title="Users" description="Admins can create and manage sales/admin accounts." />
+            {usersLoadError ? (
+              <div className="mb-3 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                {usersLoadError}
+              </div>
+            ) : null}
             <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
               <p className="text-sm font-semibold text-zinc-900">Create User</p>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
