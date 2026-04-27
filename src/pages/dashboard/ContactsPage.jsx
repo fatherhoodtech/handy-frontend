@@ -70,6 +70,14 @@ function ContactsPage() {
     city: '', state: 'AL', postalCode: '',
   })
 
+  function contactActionErrorMessage(error, fallbackMessage) {
+    const status = Number(error?.status || 0)
+    if (status >= 500) {
+      return 'We could not complete this action right now. Please try again, and if it keeps happening contact your admin.'
+    }
+    return error?.message || fallbackMessage
+  }
+
   const sortedContacts = useMemo(
     () => [...contacts].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
     [contacts]
@@ -302,7 +310,7 @@ function ContactsPage() {
       }
       setCreateModalOpen(false)
     } catch (error) {
-      setErrorMessage(error?.message || 'Failed to create contact')
+      setErrorMessage(contactActionErrorMessage(error, 'Failed to create contact'))
     } finally {
       setIsSubmitting(false)
     }
