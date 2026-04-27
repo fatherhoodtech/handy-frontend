@@ -27,7 +27,7 @@ jobs:
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
 
-      - name: Clear previous dist on server
+      - name: Prepare server frontend directories
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_HOST }}
@@ -35,8 +35,9 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             set -e
+            rm -rf /root/handy-frontend/incoming-dist
+            mkdir -p /root/handy-frontend/incoming-dist
             mkdir -p /root/handy-frontend/dist
-            rm -rf /root/handy-frontend/dist/*
 
       - name: Upload dist to droplet
         uses: appleboy/scp-action@v0.1.7
@@ -45,4 +46,20 @@ jobs:
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
           source: dist/*
-          target: /root/handy-frontend/dist/
+          target: /root/handy-frontend/incoming-dist/
+
+      - name: Normalize dist structure on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            set -e
+            rm -rf /root/handy-frontend/dist/*
+            if [ -d /root/handy-frontend/incoming-dist/dist ]; then
+              rsync -a --delete /root/handy-frontend/incoming-dist/dist/ /root/handy-frontend/dist/
+            else
+              rsync -a --delete /root/handy-frontend/incoming-dist/ /root/handy-frontend/dist/
+            fi
+            rm -rf /root/handy-frontend/incoming-dist
