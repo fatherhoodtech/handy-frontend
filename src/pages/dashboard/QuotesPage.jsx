@@ -37,6 +37,31 @@ function contactMissingFieldsFromReadiness(readiness) {
   return normalizeMissingFields(readiness).filter((field) => field.startsWith('client.'))
 }
 
+function StatCard({ label, value, sub, icon: Icon, iconClass, borderClass, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={cn(
+        'w-full rounded-xl border bg-white p-5 text-left',
+        borderClass || 'border-zinc-200',
+        onClick ? 'cursor-pointer transition-colors hover:bg-zinc-50' : 'cursor-default'
+      )}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
+          <p className="mt-2 text-3xl font-bold text-zinc-900">{value}</p>
+          <p className="mt-0.5 text-xs text-zinc-400">{sub}</p>
+        </div>
+        <span className={cn('rounded-lg p-2', iconClass)}>
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+    </button>
+  )
+}
+
 function QuotesPage() {
   const navigate = useNavigate()
   const [quotes, setQuotes] = useState([])
@@ -94,7 +119,9 @@ function QuotesPage() {
   const filteredQuotes = quotes.filter((quote) => {
     const searchText = `${quote.client ?? ''} ${quote.title ?? ''} ${quote.quoteDescription ?? ''}`.toLowerCase()
     const matchesSearch = search.trim() === '' || searchText.includes(search.trim().toLowerCase())
-    const matchesStatus = statusFilter === 'all' || quote.status === statusFilter
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'synced' ? quote.jobberSyncStatus === 'synced' : quote.status === statusFilter)
     const createdAtMs = new Date(quote.createdAt).getTime()
     const matchesDate =
       dateFilter === 'all' ||
@@ -244,54 +271,46 @@ function QuotesPage() {
     <>
       {/* Stats row */}
       <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Total quotes</p>
-              <p className="mt-2 text-3xl font-bold text-zinc-900">{isLoading ? '—' : quotes.length}</p>
-              <p className="mt-0.5 text-xs text-zinc-400">All time</p>
-            </div>
-            <span className="rounded-lg bg-zinc-100 p-2 text-zinc-600">
-              <ClipboardList className="h-4 w-4" />
-            </span>
-          </div>
-        </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Drafts</p>
-              <p className="mt-2 text-3xl font-bold text-zinc-900">{isLoading ? '—' : draftCount}</p>
-              <p className="mt-0.5 text-xs text-zinc-400">In progress</p>
-            </div>
-            <span className="rounded-lg bg-amber-50 p-2 text-amber-600">
-              <FileText className="h-4 w-4" />
-            </span>
-          </div>
-        </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Approved</p>
-              <p className="mt-2 text-3xl font-bold text-zinc-900">{isLoading ? '—' : approvedCount}</p>
-              <p className="mt-0.5 text-xs text-zinc-400">Ready to sync</p>
-            </div>
-            <span className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
-              <CheckCircle className="h-4 w-4" />
-            </span>
-          </div>
-        </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Synced to Jobber</p>
-              <p className="mt-2 text-3xl font-bold text-zinc-900">{isLoading ? '—' : syncedCount}</p>
-              <p className="mt-0.5 text-xs text-zinc-400">Sent to Jobber</p>
-            </div>
-            <span className="rounded-lg bg-sky-50 p-2 text-sky-600">
-              <RefreshCw className="h-4 w-4" />
-            </span>
-          </div>
-        </div>
+        <StatCard
+          label="Total quotes"
+          value={isLoading ? '—' : quotes.length}
+          sub="All time"
+          icon={ClipboardList}
+          iconClass="bg-zinc-100 text-zinc-600"
+          borderClass="border-zinc-200"
+          onClick={() => {
+            setSearch('')
+            setStatusFilter('all')
+            setDateFilter('all')
+          }}
+        />
+        <StatCard
+          label="Drafts"
+          value={isLoading ? '—' : draftCount}
+          sub="In progress"
+          icon={FileText}
+          iconClass="bg-amber-50 text-amber-600"
+          borderClass="border-amber-200"
+          onClick={() => setStatusFilter('draft')}
+        />
+        <StatCard
+          label="Approved"
+          value={isLoading ? '—' : approvedCount}
+          sub="Ready to sync"
+          icon={CheckCircle}
+          iconClass="bg-emerald-50 text-emerald-600"
+          borderClass="border-emerald-200"
+          onClick={() => setStatusFilter('approved')}
+        />
+        <StatCard
+          label="Synced to Jobber"
+          value={isLoading ? '—' : syncedCount}
+          sub="Sent to Jobber"
+          icon={RefreshCw}
+          iconClass="bg-sky-50 text-sky-600"
+          borderClass="border-sky-200"
+          onClick={() => setStatusFilter('synced')}
+        />
       </div>
 
       {/* Main card */}
@@ -327,6 +346,7 @@ function QuotesPage() {
                 <option value="all">All statuses</option>
                 <option value="draft">Draft</option>
                 <option value="approved">Approved</option>
+                <option value="synced">Synced to Jobber</option>
               </select>
               <select
                 className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"

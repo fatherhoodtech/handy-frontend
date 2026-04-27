@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react'
 import { apiRequest } from '@/lib/apiClient'
 import { CheckCircle, DollarSign, FileText, ListFilter, RefreshCw } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 function formatMoney(cents) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100)
 }
 
-function StatCard({ label, value, sub, icon: Icon, iconClass }) {
+function StatCard({ label, value, sub, icon: Icon, iconClass, borderClass, onClick }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-5">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={`w-full rounded-xl border bg-white p-5 text-left ${
+        borderClass || 'border-zinc-200'
+      } ${onClick ? 'transition-colors hover:bg-zinc-50 cursor-pointer' : 'cursor-default'}`}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
@@ -19,11 +26,12 @@ function StatCard({ label, value, sub, icon: Icon, iconClass }) {
           <Icon className="h-4 w-4" />
         </span>
       </div>
-    </div>
+    </button>
   )
 }
 
 function OverviewPage() {
+  const navigate = useNavigate()
   const [, setOverviewMessage] = useState('')
   const [alerts, setAlerts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -79,6 +87,8 @@ function OverviewPage() {
           sub="Open Jobber requests"
           icon={ListFilter}
           iconClass="bg-sky-50 text-sky-600"
+          borderClass="border-sky-200"
+          onClick={() => navigate('/dashboard/requests')}
         />
         <StatCard
           label="Open Drafts"
@@ -86,6 +96,8 @@ function OverviewPage() {
           sub="Quotes awaiting approval"
           icon={FileText}
           iconClass="bg-amber-50 text-amber-600"
+          borderClass="border-amber-200"
+          onClick={() => navigate('/dashboard/quotes')}
         />
         <StatCard
           label="Sent to Jobber"
@@ -93,6 +105,7 @@ function OverviewPage() {
           sub="Last 7 days"
           icon={RefreshCw}
           iconClass="bg-emerald-50 text-emerald-600"
+          borderClass="border-emerald-200"
         />
         <StatCard
           label="Revenue (30 days)"
@@ -100,6 +113,7 @@ function OverviewPage() {
           sub="30-day tracking coming soon"
           icon={DollarSign}
           iconClass="bg-violet-50 text-violet-600"
+          borderClass="border-violet-200"
         />
       </div>
 

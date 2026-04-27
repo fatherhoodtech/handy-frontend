@@ -243,13 +243,19 @@ function DashboardPage() {
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           )}>
           <p className="mb-6 text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Handy Dudes</p>
-          <div className="mb-6 rounded-2xl border border-zinc-200 bg-white p-4 text-center">
+          <button
+            type="button"
+            onClick={() => {
+              navigate('/dashboard/settings')
+              if (!isDesktop) setIsSidebarOpen(false)
+            }}
+            className="mb-6 w-full rounded-2xl border border-sky-200 bg-white p-4 text-center transition-colors hover:bg-sky-50">
             <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">
               {userInitials || 'HD'}
             </div>
             <p className="font-semibold text-zinc-900">{userName}</p>
             <p className="text-xs text-zinc-500">{user?.email ?? 'sales@handydudes.com'}</p>
-          </div>
+          </button>
 
           <nav aria-label="Dashboard navigation" className="space-y-2">
             {navItems.map((item) => (
@@ -260,8 +266,8 @@ function DashboardPage() {
                   cn(
                     'flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors',
                     isActive
-                      ? 'border-sky-500 bg-sky-500 text-white'
-                      : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-100'
+                      ? 'border-sky-300 bg-sky-50 text-sky-700'
+                      : 'border-zinc-200 bg-white text-zinc-700 hover:border-sky-300 hover:bg-sky-50'
                   )
                 }>
                 <item.icon className="h-4 w-4" />

@@ -37,6 +37,9 @@ function SettingsPage() {
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingPassword, setIsSavingPassword] = useState(false)
   const [isSavingUser, setIsSavingUser] = useState(false)
+  const [statusUpdatingUserId, setStatusUpdatingUserId] = useState(null)
+  const [deletingUserId, setDeletingUserId] = useState(null)
+  const [pendingDeleteUser, setPendingDeleteUser] = useState(null)
   const [usersLoadError, setUsersLoadError] = useState('')
 
   const tabs = useMemo(() => {
@@ -190,6 +193,54 @@ function SettingsPage() {
     }
   }
 
+  async function updateUserStatus(userId, isActive) {
+    try {
+      clearMessages()
+      setStatusUpdatingUserId(userId)
+      const response = await apiRequest(`/api/sales/users/${userId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive }),
+      })
+      const updatedUser = response?.user
+      if (updatedUser?.id) {
+        setUsers((current) => current.map((u) => (u.id === updatedUser.id ? updatedUser : u)))
+      }
+      setNotice(isActive ? 'User activated successfully.' : 'User deactivated successfully.')
+    } catch (err) {
+      setError(err?.message || 'Failed to update user status')
+    } finally {
+      setStatusUpdatingUserId(null)
+    }
+  }
+
+  function requestDeleteUser(user) {
+    if (!user || user.isActive) return
+    setPendingDeleteUser(user)
+  }
+
+  function cancelDeleteUser() {
+    if (deletingUserId != null) return
+    setPendingDeleteUser(null)
+  }
+
+  async function confirmDeleteUser() {
+    if (!pendingDeleteUser || pendingDeleteUser.isActive) return
+    try {
+      clearMessages()
+      setDeletingUserId(pendingDeleteUser.id)
+      await apiRequest(`/api/sales/users/${pendingDeleteUser.id}`, {
+        method: 'DELETE',
+      })
+      setUsers((current) => current.filter((item) => item.id !== pendingDeleteUser.id))
+      setNotice('User deleted successfully.')
+      setPendingDeleteUser(null)
+    } catch (err) {
+      setError(err?.message || 'Failed to delete user')
+    } finally {
+      setDeletingUserId(null)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="overflow-x-auto">
@@ -205,8 +256,8 @@ function SettingsPage() {
               className={cn(
                 'inline-flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors',
                 activeTab === tab.id
-                  ? 'border-sky-500 bg-sky-500 text-white shadow-sm'
-                  : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-100'
+                  ? 'border-sky-300 bg-sky-50 text-sky-700'
+                  : 'border-sky-200 bg-white text-zinc-700 hover:border-sky-300 hover:bg-sky-50'
               )}>
               <tab.icon className="h-4 w-4 shrink-0" />
               {tab.label}
@@ -215,7 +266,7 @@ function SettingsPage() {
         </nav>
       </div>
 
-      <div className="min-w-0 rounded-xl border border-zinc-200 bg-white p-6">
+      <div className="min-w-0 rounded-xl border border-sky-200 bg-white p-6">
         {error && (
           <div className="mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
@@ -235,7 +286,7 @@ function SettingsPage() {
           <div>
             <SectionHeader title="Account" description="Manage your profile and security settings." />
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+              <div className="rounded-xl border border-sky-200 bg-zinc-50 p-4">
                 <p className="text-sm font-semibold text-zinc-900">Profile Information</p>
                 <p className="mt-1 text-xs text-zinc-500">Keep your account profile up to date.</p>
                 <div className="mt-3 space-y-3">
@@ -262,7 +313,7 @@ function SettingsPage() {
                   </Button>
                 </div>
               </div>
-              <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+              <div className="rounded-xl border border-sky-200 bg-zinc-50 p-4">
                 <p className="text-sm font-semibold text-zinc-900">Change Password</p>
                 <p className="mt-1 text-xs text-zinc-500">Use a strong password with at least 8 characters.</p>
                 <div className="mt-3 space-y-3">
@@ -301,7 +352,7 @@ function SettingsPage() {
                 {usersLoadError}
               </div>
             ) : null}
-            <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+            <div className="rounded-xl border border-sky-200 bg-zinc-50 p-4">
               <p className="text-sm font-semibold text-zinc-900">Create User</p>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <Input
@@ -327,7 +378,7 @@ function SettingsPage() {
                 </Button>
               </div>
             </div>
-            <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200">
+            <div className="mt-4 overflow-hidden rounded-xl border border-sky-200">
               <table className="min-w-full">
                 <thead className="border-b border-zinc-200 bg-white">
                   <tr>
@@ -335,12 +386,13 @@ function SettingsPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Role</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Last Login</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 bg-white">
                   {users.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-sm text-zinc-500">No users yet.</td>
+                      <td colSpan={5} className="px-4 py-8 text-center text-sm text-zinc-500">No users yet.</td>
                     </tr>
                   ) : users.map((u) => (
                     <tr key={u.id}>
@@ -355,6 +407,35 @@ function SettingsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-zinc-600">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : '—'}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            'h-8 px-3',
+                            u.isActive
+                              ? 'border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50'
+                              : 'border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50'
+                          )}
+                          onClick={() => updateUserStatus(u.id, !u.isActive)}
+                          disabled={statusUpdatingUserId === u.id || deletingUserId === u.id || String(u.id) === String(profile.id)}>
+                          {statusUpdatingUserId === u.id
+                            ? 'Updating...'
+                            : u.isActive
+                              ? 'Deactivate'
+                              : 'Activate'}
+                        </Button>
+                        {!u.isActive ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="ml-2 h-8 border-red-200 px-3 text-red-700 hover:border-red-300 hover:bg-red-50"
+                            onClick={() => requestDeleteUser(u)}
+                            disabled={deletingUserId === u.id || statusUpdatingUserId === u.id || String(u.id) === String(profile.id)}>
+                            {deletingUserId === u.id ? 'Deleting...' : 'Delete'}
+                          </Button>
+                        ) : null}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -414,6 +495,39 @@ function SettingsPage() {
         )}
 
       </div>
+
+      {pendingDeleteUser ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
+          onClick={cancelDeleteUser}
+          onKeyDown={(event) => { if (event.key === 'Escape') cancelDeleteUser() }}
+          role="button"
+          tabIndex={0}>
+          <div
+            className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Delete deactivated account confirmation">
+            <h3 className="text-base font-bold text-zinc-900">Delete Deactivated Account</h3>
+            <p className="mt-2 text-sm text-zinc-600">
+              Delete <span className="font-medium">{pendingDeleteUser.email}</span>? This action cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={cancelDeleteUser} disabled={deletingUserId != null}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={confirmDeleteUser}
+                disabled={deletingUserId != null}>
+                {deletingUserId != null ? 'Deleting...' : 'Delete Account'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
