@@ -42,3 +42,10 @@ test('builds request-based continue state with fallback quote id', () => {
 test('builds legacy quote continue state for unlinked quotes', () => {
   assert.deepEqual(buildLegacyQuoteContinueState('quote-legacy'), { resumeQuoteId: 'quote-legacy' })
 })
+
+test('builds legacy quote continue state with optional request fallback id', () => {
+  assert.deepEqual(buildLegacyQuoteContinueState('quote-1', { jobberRequestIdFallback: ' 24169637 ' }), {
+    resumeQuoteId: 'quote-1',
+    jobberRequestIdFallback: '24169637',
+  })
+})

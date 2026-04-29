@@ -148,8 +148,8 @@ function SettingsPage() {
   async function savePassword() {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setError('New password and confirmation do not match.')
-      return
-    }
+          return
+        }
     try {
       clearMessages()
       setIsSavingPassword(true)
@@ -174,13 +174,13 @@ function SettingsPage() {
       clearMessages()
       setIsSavingUser(true)
       await apiRequest('/api/sales/users', {
-        method: 'POST',
-        body: JSON.stringify({
+          method: 'POST',
+          body: JSON.stringify({
           email: newUser.email.trim(),
           password: newUser.password,
           role: newUser.role,
-        }),
-      })
+          }),
+        })
       setNewUser({ email: '', password: '', role: 'sales' })
       const usersRes = await apiRequest('/api/sales/users')
       setUsers(Array.isArray(usersRes?.users) ? usersRes.users : [])
@@ -229,7 +229,7 @@ function SettingsPage() {
       clearMessages()
       setDeletingUserId(pendingDeleteUser.id)
       await apiRequest(`/api/sales/users/${pendingDeleteUser.id}`, {
-        method: 'DELETE',
+          method: 'DELETE',
       })
       setUsers((current) => current.filter((item) => item.id !== pendingDeleteUser.id))
       setNotice('User deleted successfully.')
@@ -345,7 +345,7 @@ function SettingsPage() {
         )}
 
         {activeTab === 'users' && profile.role === 'admin' && (
-          <div>
+              <div>
             <SectionHeader title="Users" description="Admins can create and manage sales/admin accounts." />
             {usersLoadError ? (
               <div className="mb-3 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -523,10 +523,10 @@ function SettingsPage() {
                 onClick={confirmDeleteUser}
                 disabled={deletingUserId != null}>
                 {deletingUserId != null ? 'Deleting...' : 'Delete Account'}
-              </Button>
+                </Button>
             </div>
           </div>
-        </div>
+      </div>
       ) : null}
     </div>
   )

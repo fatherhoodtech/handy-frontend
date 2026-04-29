@@ -83,6 +83,23 @@ function normalizeMessages(raw) {
     .filter(Boolean)
 }
 
+/** Quote `/continue` linkage failure: only explicit backend linkage reason (or legacy message fallback). */
+function isQuoteResumeLinkageFailure(error, message) {
+  const m = String(message || '').toLowerCase()
+  const reason = String(error?.reason || '').trim().toUpperCase()
+  const hasLegacyLinkageMessage =
+    m.includes('cannot be reopened') ||
+    m.includes('not linked to a client') ||
+    m.includes('no matching contact') ||
+    m.includes('no client link') ||
+    m.includes('does not resolve to a contact')
+  return error?.status === 422 && (reason === 'QUOTE_REOPEN_LINKAGE' || hasLegacyLinkageMessage)
+}
+
+function canUseRequestFallbackForQuoteResume(error) {
+  return error?.status === 422 && String(error?.reason || '').trim().toUpperCase() === 'QUOTE_REOPEN_LINKAGE'
+}
+
 function createDefaultQuoteDraft() {
   return recalcDraft({
     title: '',
@@ -501,6 +518,9 @@ function AiAssistantPage() {
   const processedCreateQuoteHandoffKeyRef = useRef(null)
   const processedJobberSeedHandoffKeyRef = useRef(null)
   const isHandlingQuoteResumeRef = useRef(false)
+  const attemptedQuoteResumeFallbackNavKeyRef = useRef(null)
+  const processedRequestContinueNavKeyRef = useRef(null)
+  const processedQuoteResumeNavKeyRef = useRef(null)
 
   function scrollToLatest(behavior = 'smooth') {
     chatBottomRef.current?.scrollIntoView({ behavior, block: 'end' })
@@ -556,6 +576,7 @@ function AiAssistantPage() {
     const continueMeta = location.state?.requestContinueMeta
     const jobberRequestId = String(location.state?.jobberRequestId ?? '').trim()
     if (!continueMeta || !jobberRequestId) return
+    if (processedRequestContinueNavKeyRef.current === location.key) return
     let cancelled = false
     async function hydrateFromRequestContinue() {
       try {
@@ -568,12 +589,12 @@ function AiAssistantPage() {
         setSelectedClientId(threadResponse?.selectedClientId ?? '')
         setDraftUpdated(false)
         didLoadThreadRef.current = true
+        processedRequestContinueNavKeyRef.current = location.key
         setActionNotice(
           continueMeta?.resumed
             ? 'Resumed existing draft for this request.'
             : 'Started a new draft for this request.'
         )
-        navigate(location.pathname, { replace: true, state: null })
         requestAnimationFrame(() => scrollToLatest('auto'))
       } catch (error) {
         if (cancelled) return
@@ -586,12 +607,13 @@ function AiAssistantPage() {
     return () => {
       cancelled = true
     }
-  }, [location.state, location.pathname, navigate])
+  }, [location.key, location.state])
 
   useEffect(() => {
     if (location.state?.requestContinueMeta) return
     const resumeQuoteId = location.state?.resumeQuoteId
     if (!resumeQuoteId || isHandlingQuoteResumeRef.current) return
+    if (processedQuoteResumeNavKeyRef.current === location.key) return
     isHandlingQuoteResumeRef.current = true
     let cancelled = false
     async function runQuoteResume() {
@@ -608,15 +630,55 @@ function AiAssistantPage() {
         setSelectedClientId(response?.selectedClientId ?? '')
         setDraftUpdated(false)
         didLoadThreadRef.current = true
+        processedQuoteResumeNavKeyRef.current = location.key
         setActionNotice('Draft quote loaded into AI Assistant. Continue editing below.')
-        navigate(location.pathname, { replace: true, state: null })
         requestAnimationFrame(() => scrollToLatest('auto'))
       } catch (error) {
         if (cancelled) return
         const message = error?.message || 'Failed to load selected draft quote'
-        setChatError(message)
-        if (String(message).toLowerCase().includes('cannot be reopened')) {
-          setActionNotice('This quote cannot be reopened directly. Start from Requests > Continue with AI to relink it.')
+        const fallbackId = String(location.state?.jobberRequestIdFallback ?? '').trim()
+        const canAttemptFallbackForNav = attemptedQuoteResumeFallbackNavKeyRef.current !== location.key
+        const shouldTryRequestFallback = Boolean(
+          fallbackId && canAttemptFallbackForNav && canUseRequestFallbackForQuoteResume(error)
+        )
+        if (shouldTryRequestFallback) {
+          attemptedQuoteResumeFallbackNavKeyRef.current = location.key
+          try {
+            const continueResponse = await apiRequest(
+              `/api/sales/requests/${encodeURIComponent(fallbackId)}/continue`,
+              { method: 'POST' }
+            )
+            if (cancelled) return
+            setMessages(normalizeMessages(continueResponse?.messages))
+            if (continueResponse?.quoteDraft) setQuoteDraft(recalcDraft(continueResponse.quoteDraft))
+            setSelectedClientId(String(continueResponse?.selectedClientId ?? '').trim())
+            setDraftUpdated(false)
+            didLoadThreadRef.current = true
+            processedQuoteResumeNavKeyRef.current = location.key
+            setChatError('')
+            setActionNotice(
+              continueResponse?.resumed
+                ? 'Opened the latest draft for this Jobber request after the selected quote could not be linked automatically.'
+                : 'Started a new AI draft from this Jobber request after the selected quote could not be reopened.'
+            )
+            requestAnimationFrame(() => scrollToLatest('auto'))
+          } catch (fallbackErr) {
+            if (cancelled) return
+            setChatError(
+              fallbackErr?.message ||
+                'Could not open this quote in AI or continue from its Jobber request.'
+            )
+            setActionNotice(
+              'Try Requests > Continue with AI for this lead, or link a client to the quote in Contacts.'
+            )
+          }
+        } else {
+          setChatError(message)
+          if (isQuoteResumeLinkageFailure(error, message)) {
+            setActionNotice(
+              'This quote cannot be reopened directly. Open it from Requests > Continue with AI or link a client in Contacts.'
+            )
+          }
         }
       } finally {
         isHandlingQuoteResumeRef.current = false
@@ -627,7 +689,7 @@ function AiAssistantPage() {
     return () => {
       cancelled = true
     }
-  }, [location.state, location.pathname, navigate])
+  }, [location.key, location.state])
 
   useEffect(() => {
     const handoffContactId = location.state?.contactId

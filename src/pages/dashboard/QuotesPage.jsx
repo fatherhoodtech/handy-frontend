@@ -5,11 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, FileText, CheckCircle, RefreshCw, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  buildLegacyQuoteContinueState,
-  buildRequestContinueState,
-  getLinkedJobberRequestId,
-} from './quoteContinue'
+import { buildLegacyQuoteContinueState, getLinkedJobberRequestId } from './quoteContinue'
 
 function formatMoneyFromCents(cents) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100)
@@ -144,31 +140,15 @@ function QuotesPage() {
     }
   }
 
-  async function handleContinueDraft(quote) {
+  function handleContinueDraft(quote) {
     const quoteId = String(quote?.id ?? '').trim()
     if (!quoteId) return
     const jobberRequestId = getLinkedJobberRequestId(quote)
     setError('')
-    try {
-      if (jobberRequestId) {
-        const continueResponse = await apiRequest(
-          `/api/sales/requests/${encodeURIComponent(jobberRequestId)}/continue`,
-          { method: 'POST' }
-        )
-        navigate('/dashboard/ai-assistant', {
-          state: buildRequestContinueState({
-            jobberRequestId,
-            continueResponse,
-            fallbackQuoteId: quoteId,
-          }),
-        })
-        return
-      }
-      // Legacy fallback for older quotes that are not linked to a request id.
-      navigate('/dashboard/ai-assistant', { state: buildLegacyQuoteContinueState(quoteId) })
-    } catch (err) {
-      setError(err?.message || 'Failed to continue this quote in AI Assistant')
-    }
+    // Always open by quote id first; AI Assistant may use jobberRequestIdFallback once on linkage 422.
+    navigate('/dashboard/ai-assistant', {
+      state: buildLegacyQuoteContinueState(quoteId, { jobberRequestIdFallback: jobberRequestId || undefined }),
+    })
   }
 
   function handleEditContactForQuote(quote) {
@@ -332,13 +312,13 @@ function QuotesPage() {
             <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
               <div className="relative min-w-[220px] flex-1">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search quotes..."
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search quotes..."
                   className="h-9 w-full rounded-lg border-zinc-200 pl-8 text-sm"
-                />
-              </div>
+              />
+            </div>
               <select
                 className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
                 value={statusFilter}
@@ -348,21 +328,21 @@ function QuotesPage() {
                 <option value="approved">Approved</option>
                 <option value="synced">Synced to Jobber</option>
               </select>
-              <select
+            <select
                 className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
-                value={dateFilter}
-                onChange={(event) => setDateFilter(event.target.value)}>
-                <option value="all">All time</option>
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-              </select>
+              value={dateFilter}
+              onChange={(event) => setDateFilter(event.target.value)}>
+              <option value="all">All time</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+            </select>
               {hasActiveFilters ? (
-                <button
-                  type="button"
+              <button
+                type="button"
                   className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-                  onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
+                onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
                   Clear
-                </button>
+              </button>
               ) : null}
             </div>
           </div>
@@ -430,74 +410,74 @@ function QuotesPage() {
             </div>
 
             <div className="hidden overflow-x-auto md:block">
-              <table className="min-w-full">
-                <thead className="border-b border-zinc-200 bg-white">
-                  <tr>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Client</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Quote Title</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Price</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Jobber</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Created</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
-                  {filteredQuotes.map((quote, index) => (
-                    <tr
-                      key={`${quote.createdAt}-${index}`}
-                      className="cursor-pointer transition-colors hover:bg-zinc-50"
-                      onClick={() => openQuoteDetail(quote.id)}>
-                      <td className="px-5 py-3.5 text-sm font-semibold text-zinc-900">{quote.client}</td>
-                      <td className="max-w-[400px] px-5 py-3.5">
-                        <p className="line-clamp-1 text-sm font-medium text-zinc-900">{quote.title}</p>
-                        {quote.quoteDescription ? (
-                          <p className="line-clamp-1 text-xs text-zinc-500">{quote.quoteDescription}</p>
-                        ) : null}
-                      </td>
-                      <td className="px-5 py-3.5 text-sm font-medium text-zinc-900">
-                        {formatMoneyFromCents(quote.amountCents)}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className={cn(
-                          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
-                          quote.status === 'draft'
-                            ? 'border-amber-200 bg-amber-50 text-amber-700'
-                            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                        )}>
-                          <span className={cn('h-1.5 w-1.5 rounded-full', quote.status === 'draft' ? 'bg-amber-400' : 'bg-emerald-500')} />
-                          {quote.status === 'draft' ? 'Draft' : 'Approved'}
+            <table className="min-w-full">
+              <thead className="border-b border-zinc-200 bg-white">
+                <tr>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Client</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Quote Title</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Price</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Jobber</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Created</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {filteredQuotes.map((quote, index) => (
+                  <tr
+                    key={`${quote.createdAt}-${index}`}
+                    className="cursor-pointer transition-colors hover:bg-zinc-50"
+                    onClick={() => openQuoteDetail(quote.id)}>
+                    <td className="px-5 py-3.5 text-sm font-semibold text-zinc-900">{quote.client}</td>
+                    <td className="max-w-[400px] px-5 py-3.5">
+                      <p className="line-clamp-1 text-sm font-medium text-zinc-900">{quote.title}</p>
+                      {quote.quoteDescription ? (
+                        <p className="line-clamp-1 text-xs text-zinc-500">{quote.quoteDescription}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm font-medium text-zinc-900">
+                      {formatMoneyFromCents(quote.amountCents)}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+                        quote.status === 'draft'
+                          ? 'border-amber-200 bg-amber-50 text-amber-700'
+                          : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      )}>
+                        <span className={cn('h-1.5 w-1.5 rounded-full', quote.status === 'draft' ? 'bg-amber-400' : 'bg-emerald-500')} />
+                        {quote.status === 'draft' ? 'Draft' : 'Approved'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs">
+                      {quote.jobberSyncStatus === 'synced' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Synced
                         </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-xs">
-                        {quote.jobberSyncStatus === 'synced' ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Synced
-                          </span>
-                        ) : quote.jobberSyncStatus === 'failed' ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
-                            <span className="h-1.5 w-1.5 rounded-full bg-red-400" />Failed
-                          </span>
-                        ) : jobberReadinessByQuoteId[quote.id]?.ready ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
-                            <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />Ready
-                          </span>
-                        ) : quote.status === 'approved' ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />Pending
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-500">
-                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />N/A
-                          </span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-sm text-zinc-500">
-                        {formatRelativeTime(quote.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      ) : quote.jobberSyncStatus === 'failed' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-400" />Failed
+                        </span>
+                      ) : jobberReadinessByQuoteId[quote.id]?.ready ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />Ready
+                        </span>
+                      ) : quote.status === 'approved' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />Pending
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-500">
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />N/A
+                        </span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-sm text-zinc-500">
+                      {formatRelativeTime(quote.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
             </div>
           </div>
         )}
@@ -568,8 +548,8 @@ function QuotesPage() {
                           Edit Contact
                         </Button>
                       </div>
-                    ) : null}
-                  </div>
+                ) : null}
+              </div>
                 </div>
               </div>
               <div>
@@ -578,7 +558,7 @@ function QuotesPage() {
                   <p className="text-xs text-zinc-400">
                     {Array.isArray(selectedQuote.lineItems) ? selectedQuote.lineItems.length : 0} item(s)
                   </p>
-                </div>
+              </div>
                 {Array.isArray(selectedQuote.lineItems) && selectedQuote.lineItems.length > 0 ? (
                   <div className="overflow-hidden rounded-xl border border-zinc-200 shadow-sm">
                     <table className="min-w-full divide-y divide-zinc-200">

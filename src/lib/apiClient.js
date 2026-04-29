@@ -87,8 +87,10 @@ function normalizeHtmlError(raw) {
 async function parseApiError(response, requestPath) {
   const raw = await response.text()
   let message = 'Request failed'
+  let parsedBody = null
   try {
     const body = raw ? JSON.parse(raw) : {}
+    parsedBody = body
     message = body?.message || body?.error || message
   } catch {
     const htmlMessage = normalizeHtmlError(raw)
@@ -116,6 +118,10 @@ async function parseApiError(response, requestPath) {
   }
   const error = new Error(message)
   error.status = response.status
+  if (parsedBody && typeof parsedBody === 'object') {
+    error.reason = typeof parsedBody.reason === 'string' ? parsedBody.reason : ''
+    error.errorCode = typeof parsedBody.errorCode === 'string' ? parsedBody.errorCode : ''
+  }
   throw error
 }
 

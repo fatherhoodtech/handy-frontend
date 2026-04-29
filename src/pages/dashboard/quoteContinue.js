@@ -14,6 +14,16 @@ export function buildRequestContinueState({ jobberRequestId, continueResponse, f
   }
 }
 
-export function buildLegacyQuoteContinueState(quoteId) {
-  return { resumeQuoteId: String(quoteId ?? '').trim() }
+/**
+ * @param {string} quoteId
+ * @param {{ jobberRequestIdFallback?: string }} [options]
+ */
+export function buildLegacyQuoteContinueState(quoteId, options = {}) {
+  const resumeQuoteId = String(quoteId ?? '').trim()
+  const state = { resumeQuoteId }
+  const fallback = String(options.jobberRequestIdFallback ?? '').trim()
+  if (fallback) {
+    state.jobberRequestIdFallback = fallback
+  }
+  return state
 }

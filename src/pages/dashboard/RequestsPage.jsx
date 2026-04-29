@@ -260,21 +260,21 @@ function RequestsPage() {
       const resumed = Boolean(continueResponse?.resumed)
       const quoteId = String(continueResponse?.quoteId ?? '')
     const hasLead = Boolean(item.leadId?.trim())
-      navigate('/dashboard/ai-assistant', {
-        state: {
-          ...(hasLead
-            ? {
-                contactId: item.leadId,
-                startNewChat: true,
-                handoffClient: {
-                  fullName: item.name || '',
-                  phone: item.phone || '',
-                  email: item.email || '',
-                  address: [item.addressLine1, item.city, item.state, item.postalCode].filter(Boolean).join(', '),
-                },
-              }
-            : { startNewChat: true }),
-          jobberRequestSeed: seed,
+    navigate('/dashboard/ai-assistant', {
+      state: {
+        ...(hasLead
+          ? {
+              contactId: item.leadId,
+              startNewChat: true,
+              handoffClient: {
+                fullName: item.name || '',
+                phone: item.phone || '',
+                email: item.email || '',
+                address: [item.addressLine1, item.city, item.state, item.postalCode].filter(Boolean).join(', '),
+              },
+            }
+          : { startNewChat: true }),
+        jobberRequestSeed: seed,
           jobberRequestId,
           requestContinueMeta: { created, resumed, quoteId },
         },
@@ -444,10 +444,10 @@ function RequestsPage() {
           </div>
           <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search requests..."
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search requests..."
                 className="h-9 min-w-[220px] flex-1 rounded-lg border-zinc-200"
               />
               <select
@@ -483,9 +483,9 @@ function RequestsPage() {
               Create request
             </Button>
           </div>
-        </div>
+      </div>
 
-        {errorMessage && (
+      {errorMessage && (
           <div className="border-b border-red-100 bg-red-50 px-5 py-3">
             <p className="text-sm text-red-700">{errorMessage}</p>
           </div>
@@ -542,76 +542,76 @@ function RequestsPage() {
             </div>
 
             <div className="hidden overflow-x-auto md:block">
-              <table className="min-w-full divide-y divide-zinc-100 text-sm">
-                <thead>
-                  <tr className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                    <th className="px-4 py-3">Client</th>
-                    <th className="px-4 py-3">Title</th>
-                    <th className="px-4 py-3">Property</th>
-                    <th className="px-4 py-3">Contact</th>
-                    <th className="px-4 py-3">Requested</th>
-                    <th className="px-4 py-3 text-right">AI quote</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
+            <table className="min-w-full divide-y divide-zinc-100 text-sm">
+              <thead>
+                <tr className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                  <th className="px-4 py-3">Client</th>
+                  <th className="px-4 py-3">Title</th>
+                  <th className="px-4 py-3">Property</th>
+                  <th className="px-4 py-3">Contact</th>
+                  <th className="px-4 py-3">Requested</th>
+                  <th className="px-4 py-3 text-right">AI quote</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
                   {filtered.map((item, index) => (
-                    <tr
-                      key={item.id}
-                      className="group cursor-pointer hover:bg-zinc-50"
-                      onClick={() => setSelected(item)}>
-                      {/* Client */}
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-zinc-900">{item.name || '—'}</div>
-                        {item.companyName ? (
-                          <div className="text-xs text-zinc-400">{item.companyName}</div>
-                        ) : null}
-                      </td>
-                      {/* Title */}
-                      <td className="px-4 py-3 text-zinc-700 max-w-[180px] truncate">
-                        {item.title || '—'}
-                      </td>
-                      {/* Property */}
-                      <td className="px-4 py-3 text-zinc-500 text-xs max-w-[160px]">
-                        {[item.city, item.state, item.postalCode].filter(Boolean).join(', ') || '—'}
-                      </td>
-                      {/* Contact */}
-                      <td className="px-4 py-3">
-                        {item.phone ? (
-                          <div className="text-zinc-700">{item.phone}</div>
-                        ) : null}
-                        {item.email ? (
-                          <div className="text-xs text-zinc-400">{item.email}</div>
-                        ) : null}
-                        {!item.phone && !item.email ? <span className="text-zinc-400">—</span> : null}
-                      </td>
-                      {/* Requested */}
-                      <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">
-                        {formatRequested(item.createdAt)}
-                      </td>
-                      {/* AI action */}
-                      <td className="px-4 py-3 text-right">
+                  <tr
+                    key={item.id}
+                    className="group cursor-pointer hover:bg-zinc-50"
+                    onClick={() => setSelected(item)}>
+                    {/* Client */}
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-zinc-900">{item.name || '—'}</div>
+                      {item.companyName ? (
+                        <div className="text-xs text-zinc-400">{item.companyName}</div>
+                      ) : null}
+                    </td>
+                    {/* Title */}
+                    <td className="px-4 py-3 text-zinc-700 max-w-[180px] truncate">
+                      {item.title || '—'}
+                    </td>
+                    {/* Property */}
+                    <td className="px-4 py-3 text-zinc-500 text-xs max-w-[160px]">
+                      {[item.city, item.state, item.postalCode].filter(Boolean).join(', ') || '—'}
+                    </td>
+                    {/* Contact */}
+                    <td className="px-4 py-3">
+                      {item.phone ? (
+                        <div className="text-zinc-700">{item.phone}</div>
+                      ) : null}
+                      {item.email ? (
+                        <div className="text-xs text-zinc-400">{item.email}</div>
+                      ) : null}
+                      {!item.phone && !item.email ? <span className="text-zinc-400">—</span> : null}
+                    </td>
+                    {/* Requested */}
+                    <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">
+                      {formatRequested(item.createdAt)}
+                    </td>
+                    {/* AI action */}
+                    <td className="px-4 py-3 text-right">
                         {(() => {
                           const usePrimaryTone = index % 2 === 0
                           const buttonToneClass = usePrimaryTone
                             ? 'border-sky-200 bg-sky-50 text-sky-600 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-700'
                             : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-700'
                           return (
-                            <Button
-                              type="button"
-                              size="sm"
+                      <Button
+                        type="button"
+                        size="sm"
                               className={`h-8 w-8 border p-0 shadow-sm transition-colors ${buttonToneClass}`}
                               onClick={(e) => handleContinueWithAI(item, e)}
                               aria-label="Continue with AI"
                               title="Continue with AI">
                               <Sparkles className="h-4 w-4" />
-                            </Button>
+                      </Button>
                           )
                         })()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
             </div>
           </div>
         )}
@@ -656,7 +656,7 @@ function RequestsPage() {
             {/* Scrollable body */}
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm">
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                {selected.title ? (
+              {selected.title ? (
                   <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm lg:col-span-2">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 basis-4/5">
@@ -672,25 +672,25 @@ function RequestsPage() {
                           Lead cost: {formatCurrency(resolveLeadCost(selected)) || '—'}
                         </p>
                       </div>
-                    </div>
-                  </div>
-                ) : null}
+                </div>
+                </div>
+              ) : null}
 
                 {(selected.phone || selected.email || selected.addressLine1 || selected.city || selected.state || selected.postalCode) ? (
                   <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Contact</p>
                     {selected.phone ? <p className="mt-1 text-sm text-zinc-800"><span className="font-semibold">Phone:</span> {selected.phone}</p> : null}
                     {selected.email ? <p className="text-sm text-zinc-700"><span className="font-semibold">Email:</span> {selected.email}</p> : null}
-                    {(selected.addressLine1 || selected.city || selected.state || selected.postalCode) ? (
+              {(selected.addressLine1 || selected.city || selected.state || selected.postalCode) ? (
                       <p className="mt-1 text-sm text-zinc-700">
                         <span className="font-semibold">Address:</span> {[
-                          selected.addressLine1,
-                          [selected.city, selected.state, selected.postalCode].filter(Boolean).join(', '),
-                        ].filter(Boolean).join(', ')}
-                      </p>
+                      selected.addressLine1,
+                      [selected.city, selected.state, selected.postalCode].filter(Boolean).join(', '),
+                    ].filter(Boolean).join(', ')}
+                  </p>
                     ) : null}
-                  </div>
-                ) : null}
+                </div>
+              ) : null}
 
                 <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Request details</p>
@@ -987,7 +987,7 @@ function RequestsPage() {
             </div>
           </div>
         </div>
-        ) : null}
+      ) : null}
     </div>
   )
 }
