@@ -527,7 +527,7 @@ function AiAssistantPage() {
   }
 
   useEffect(() => {
-    const hasResumeQuote = Boolean(location.state?.resumeQuoteId)
+    const hasResumeQuote = Boolean(location.state?.resumeQuoteId) || Boolean(location.state?.quoteContinueMeta)
     const hasRequestContinueMeta = Boolean(location.state?.requestContinueMeta)
     const hasContactHandoff = Boolean(location.state?.contactId && location.state?.startNewChat)
     const hasJobberSeedOnly = Boolean(
@@ -610,7 +610,41 @@ function AiAssistantPage() {
   }, [location.key, location.state])
 
   useEffect(() => {
+    const continueMeta = location.state?.quoteContinueMeta
+    if (!continueMeta) return
+    if (processedQuoteResumeNavKeyRef.current === location.key) return
+    let cancelled = false
+    async function hydrateFromQuoteContinue() {
+      try {
+        setIsLoadingThread(true)
+        setChatError('')
+        const threadResponse = await apiRequest('/api/sales/ai-assistant/thread')
+        if (cancelled) return
+        setMessages(normalizeMessages(threadResponse?.messages))
+        if (threadResponse?.quoteDraft) setQuoteDraft(recalcDraft(threadResponse.quoteDraft))
+        setSelectedClientId(threadResponse?.selectedClientId ?? '')
+        setDraftUpdated(false)
+        didLoadThreadRef.current = true
+        processedQuoteResumeNavKeyRef.current = location.key
+        setActionNotice('Draft quote loaded into AI Assistant. Continue editing below.')
+        setTimeout(() => setActionNotice(''), 4000)
+        requestAnimationFrame(() => scrollToLatest('auto'))
+      } catch (error) {
+        if (cancelled) return
+        setChatError(error?.message || 'Failed to load quote into AI assistant')
+      } finally {
+        if (!cancelled) setIsLoadingThread(false)
+      }
+    }
+    void hydrateFromQuoteContinue()
+    return () => {
+      cancelled = true
+    }
+  }, [location.key, location.state])
+
+  useEffect(() => {
     if (location.state?.requestContinueMeta) return
+    if (location.state?.quoteContinueMeta) return
     const resumeQuoteId = location.state?.resumeQuoteId
     if (!resumeQuoteId || isHandlingQuoteResumeRef.current) return
     if (processedQuoteResumeNavKeyRef.current === location.key) return
@@ -631,7 +665,10 @@ function AiAssistantPage() {
         setDraftUpdated(false)
         didLoadThreadRef.current = true
         processedQuoteResumeNavKeyRef.current = location.key
-        setActionNotice('Draft quote loaded into AI Assistant. Continue editing below.')
+        const notice = response?.contactWarning
+          ? `Draft quote loaded. Note: ${response.contactWarning}`
+          : 'Draft quote loaded into AI Assistant. Continue editing below.'
+        setActionNotice(notice)
         requestAnimationFrame(() => scrollToLatest('auto'))
       } catch (error) {
         if (cancelled) return

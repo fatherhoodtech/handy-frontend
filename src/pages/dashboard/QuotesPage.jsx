@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, FileText, CheckCircle, RefreshCw, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { buildLegacyQuoteContinueState, getLinkedJobberRequestId } from './quoteContinue'
 
 function formatMoneyFromCents(cents) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100)
@@ -68,6 +67,7 @@ function QuotesPage() {
   const [dateFilter, setDateFilter] = useState('all')
   const [selectedQuote, setSelectedQuote] = useState(null)
   const [isLoadingQuoteDetail, setIsLoadingQuoteDetail] = useState(false)
+  const [isContinuingDraftId, setIsContinuingDraftId] = useState(null)
   const [isDeletingQuoteId, setIsDeletingQuoteId] = useState('')
   const [isRetryingJobberQuoteId, setIsRetryingJobberQuoteId] = useState('')
   const [deleteQuoteTarget, setDeleteQuoteTarget] = useState(null)
@@ -140,15 +140,23 @@ function QuotesPage() {
     }
   }
 
-  function handleContinueDraft(quote) {
+  async function handleContinueDraft(quote) {
     const quoteId = String(quote?.id ?? '').trim()
-    if (!quoteId) return
-    const jobberRequestId = getLinkedJobberRequestId(quote)
+    if (!quoteId || isContinuingDraftId) return
     setError('')
-    // Always open by quote id first; AI Assistant may use jobberRequestIdFallback once on linkage 422.
-    navigate('/dashboard/ai-assistant', {
-      state: buildLegacyQuoteContinueState(quoteId, { jobberRequestIdFallback: jobberRequestId || undefined }),
-    })
+    setIsContinuingDraftId(quoteId)
+    try {
+      await apiRequest(`/api/sales/quotes/${encodeURIComponent(quoteId)}/continue`, { method: 'POST' })
+      navigate('/dashboard/ai-assistant', {
+        state: {
+          quoteContinueMeta: { quoteId, title: quote?.title ?? '', resumed: true },
+        },
+      })
+    } catch (err) {
+      setError(err?.message || 'Failed to open quote in AI assistant. Please try again.')
+    } finally {
+      setIsContinuingDraftId(null)
+    }
   }
 
   function handleEditContactForQuote(quote) {
@@ -628,10 +636,16 @@ function QuotesPage() {
                       </span>
                     )
                   })()}
-                  <Button type="button" onClick={() => handleContinueDraft(selectedQuote)}>
-                    {selectedQuote.status === 'draft'
-                      ? 'Continue in AI'
-                      : 'Edit in AI'}
+                  <Button
+                    type="button"
+                    disabled={!!isContinuingDraftId}
+                    onClick={() => handleContinueDraft(selectedQuote)}
+                  >
+                    {isContinuingDraftId === selectedQuote.id
+                      ? 'Loading…'
+                      : selectedQuote.status === 'draft'
+                        ? 'Continue in AI'
+                        : 'Edit in AI'}
                   </Button>
                 </div>
               </div>
