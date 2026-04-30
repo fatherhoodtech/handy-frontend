@@ -10,24 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build -- --mode production
-        env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-
-      - name: Prepare server frontend directories
+      - name: Deploy to DigitalOcean
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_HOST }}
@@ -35,31 +18,15 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             set -e
-            rm -rf /root/handy-frontend/incoming-dist
-            mkdir -p /root/handy-frontend/incoming-dist
-            mkdir -p /root/handy-frontend/dist
 
-      - name: Upload dist to droplet
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_USER }}
-          key: ${{ secrets.DO_SSH_KEY }}
-          source: dist/*
-          target: /root/handy-frontend/incoming-dist/
-
-      - name: Normalize dist structure on server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_USER }}
-          key: ${{ secrets.DO_SSH_KEY }}
-          script: |
-            set -e
-            rm -rf /root/handy-frontend/dist/*
-            if [ -d /root/handy-frontend/incoming-dist/dist ]; then
-              rsync -a --delete /root/handy-frontend/incoming-dist/dist/ /root/handy-frontend/dist/
+            # Clone repo on first deploy, pull on subsequent ones
+            if [ ! -d /root/handy-frontend ]; then
+              git clone https://x-access-token:${{ secrets.DEPLOY_REPO_PAT }}@github.com/fatherhoodtech/handy-frontend.git /root/handy-frontend
             else
-              rsync -a --delete /root/handy-frontend/incoming-dist/ /root/handy-frontend/dist/
+              cd /root/handy-frontend
+              git pull https://x-access-token:${{ secrets.DEPLOY_REPO_PAT }}@github.com/fatherhoodtech/handy-frontend.git main
             fi
-            rm -rf /root/handy-frontend/incoming-dist
+
+            cd /root/Handy-Dudes-Node-Quote-Engine/deploy/handy.us.eqv.rw
+            docker compose build frontend
+            docker compose up -d frontend
