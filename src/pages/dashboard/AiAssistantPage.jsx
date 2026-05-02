@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
 import { dollarsToCents } from '@/lib/pricingMoney'
 import { Bot, Copy, FileText, History, X } from 'lucide-react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useBlocker, useLocation, useNavigate } from 'react-router-dom'
 
 function toInt(value) {
   const parsed = Number.parseInt(String(value ?? '0'), 10)
@@ -520,6 +520,8 @@ function AiAssistantPage() {
   const [draftUpdated, setDraftUpdated] = useState(false)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isApprovingQuote, setIsApprovingQuote] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [autoSaveStatus, setAutoSaveStatus] = useState('idle') // 'idle' | 'saving' | 'saved' | 'error'
   const [isCreatingNewChat, setIsCreatingNewChat] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historySearch, setHistorySearch] = useState('')
@@ -532,6 +534,7 @@ function AiAssistantPage() {
   const [pendingSeedHandoff, setPendingSeedHandoff] = useState(null)
   const [pendingContactHandoff, setPendingContactHandoff] = useState(null)
   const [isHandoffSaving, setIsHandoffSaving] = useState(false)
+  const blocker = useBlocker(hasUnsavedChanges)
   const chatViewportRef = useRef(null)
   const chatBottomRef = useRef(null)
   const clientPickerRef = useRef(null)
@@ -1185,6 +1188,37 @@ function AiAssistantPage() {
     textarea.style.height = `${Math.min(textarea.scrollHeight, 140)}px`
   }, [prompt])
 
+  // Mark draft dirty when user edits (skip while thread is still loading)
+  useEffect(() => {
+    if (isLoadingThread || !selectedClientId) return
+    setHasUnsavedChanges(true)
+  }, [quoteDraft])
+
+  // Debounced autosave — fires 3s after the user stops making changes
+  useEffect(() => {
+    if (!selectedClientId || isSavingDraft || isApprovingQuote || isCreatingNewChat || !hasUnsavedChanges) return
+    const timer = setTimeout(() => handleAutoSave(), 3000)
+    return () => clearTimeout(timer)
+  }, [quoteDraft, selectedClientId, hasUnsavedChanges])
+
+  // Warn on browser-level navigation (refresh, tab close, browser back)
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasUnsavedChanges])
+
+  // Handle React Router in-app navigation block
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+    if (window.confirm('You have unsaved changes. Leave anyway?')) {
+      blocker.proceed()
+    } else {
+      blocker.reset()
+    }
+  }, [blocker.state])
+
   function handleChatScroll() {
     const el = chatViewportRef.current
     if (!el) return
@@ -1434,11 +1468,30 @@ function AiAssistantPage() {
           ? `Draft saved successfully (${quoteId.slice(0, 8)}). Started a new blank draft.`
           : 'Draft saved successfully. Started a new blank draft.'
       )
+      setHasUnsavedChanges(false)
+      setAutoSaveStatus('idle')
       requestAnimationFrame(() => scrollToLatest('auto'))
     } catch (error) {
       setChatError(error?.message || 'Failed to save draft quote')
     } finally {
       setIsSavingDraft(false)
+    }
+  }
+
+  async function handleAutoSave() {
+    if (!selectedClientId || isSavingDraft || isApprovingQuote || isCreatingNewChat) return
+    setAutoSaveStatus('saving')
+    try {
+      const jobberRequestId = String(location.state?.jobberRequestId ?? '').trim() || undefined
+      await apiRequest('/api/sales/ai-assistant/draft/save', {
+        method: 'POST',
+        body: JSON.stringify({ jobberRequestId, quoteDraft }),
+      })
+      setHasUnsavedChanges(false)
+      setAutoSaveStatus('saved')
+      setTimeout(() => setAutoSaveStatus('idle'), 3000)
+    } catch {
+      setAutoSaveStatus('error')
     }
   }
 
@@ -1467,6 +1520,8 @@ function AiAssistantPage() {
       setSelectedClientId('')
       setClientSearch('')
       setDraftUpdated(false)
+      setHasUnsavedChanges(false)
+      setAutoSaveStatus('idle')
       setCatalogSearch('')
       setCatalogSelectionId('')
       setLaborTradeSearch('')
@@ -1561,68 +1616,70 @@ function AiAssistantPage() {
           </div>
           <div className="min-h-0 flex flex-1 flex-col overflow-hidden px-5 pb-5 pt-4">
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-zinc-600">Quote Title</label>
-                <Input value={quoteDraft.title} onChange={(event) => updateQuoteField('title', event.target.value)} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">Quote Title</p>
+                  <Input value={quoteDraft.title} onChange={(event) => updateQuoteField('title', event.target.value)} />
+                </div>
+
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">Client Selection</p>
+                  <div className="space-y-1" ref={clientPickerRef}>
+                    <Input
+                      value={clientSearch}
+                      placeholder={selectedClient ? selectedClient.name : 'Type name, email, or phone...'}
+                      onFocus={() => setIsClientPickerOpen(true)}
+                      onChange={(event) => {
+                        setClientSearch(event.target.value)
+                        setIsClientPickerOpen(true)
+                      }}
+                      disabled={isSavingClient || isLoadingThread}
+                    />
+                    {isClientPickerOpen ? (
+                      <div className="max-h-56 overflow-y-auto rounded-md border border-zinc-200 bg-white">
+                        {isLoadingClientOptions ? (
+                          <p className="px-3 py-2 text-xs text-zinc-500">Searching clients...</p>
+                        ) : null}
+                        {!isLoadingClientOptions && clientOptions.length === 0 ? (
+                          <p className="px-3 py-2 text-xs text-zinc-500">No clients found.</p>
+                        ) : null}
+                        {!isLoadingClientOptions
+                          ? clientOptions.map((client) => (
+                              <button
+                                key={client.id}
+                                type="button"
+                                className={`flex w-full flex-col px-3 py-2 text-left hover:bg-zinc-50 ${
+                                  client.id === selectedClientId ? 'bg-zinc-100' : ''
+                                }`}
+                                onClick={() => handleSelectClient(client.id)}>
+                                <span className="text-sm font-medium text-zinc-900">{client.name}</span>
+                                {client.subtitle ? (
+                                  <span className="text-xs text-zinc-500">{client.subtitle}</span>
+                                ) : null}
+                              </button>
+                            ))
+                          : null}
+                      </div>
+                    ) : null}
+                    {selectedClient ? (
+                      <p className="text-xs text-zinc-600">
+                        Selected: <span className="font-semibold">{selectedClient.name}</span>
+                      </p>
+                    ) : null}
+                    <p className="text-xs text-zinc-500">
+                      Client details are auto-resolved for Jobber in the background.
+                    </p>
+                  </div>
+                </div>
               </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-zinc-600">Quote Description</label>
                 <textarea
-                  className="min-h-20 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400"
+                  className="min-h-32 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400"
                   value={quoteDraft.quoteDescription ?? ''}
                   onChange={(event) => updateQuoteField('quoteDescription', event.target.value)}
                 />
-              </div>
-
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-600">Client Selection</p>
-                <div className="space-y-1" ref={clientPickerRef}>
-                  <label className="text-xs font-semibold text-zinc-600">Search Client</label>
-                  <Input
-                    value={clientSearch}
-                    placeholder={selectedClient ? selectedClient.name : 'Type name, email, or phone...'}
-                    onFocus={() => setIsClientPickerOpen(true)}
-                    onChange={(event) => {
-                      setClientSearch(event.target.value)
-                      setIsClientPickerOpen(true)
-                    }}
-                    disabled={isSavingClient || isLoadingThread}
-                  />
-                  {isClientPickerOpen ? (
-                    <div className="max-h-56 overflow-y-auto rounded-md border border-zinc-200 bg-white">
-                      {isLoadingClientOptions ? (
-                        <p className="px-3 py-2 text-xs text-zinc-500">Searching clients...</p>
-                      ) : null}
-                      {!isLoadingClientOptions && clientOptions.length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-zinc-500">No clients found.</p>
-                      ) : null}
-                      {!isLoadingClientOptions
-                        ? clientOptions.map((client) => (
-                            <button
-                              key={client.id}
-                              type="button"
-                              className={`flex w-full flex-col px-3 py-2 text-left hover:bg-zinc-50 ${
-                                client.id === selectedClientId ? 'bg-zinc-100' : ''
-                              }`}
-                              onClick={() => handleSelectClient(client.id)}>
-                              <span className="text-sm font-medium text-zinc-900">{client.name}</span>
-                              {client.subtitle ? (
-                                <span className="text-xs text-zinc-500">{client.subtitle}</span>
-                              ) : null}
-                            </button>
-                          ))
-                        : null}
-                    </div>
-                  ) : null}
-                  {selectedClient ? (
-                    <p className="text-xs text-zinc-600">
-                      Selected: <span className="font-semibold">{selectedClient.name}</span>
-                    </p>
-                  ) : null}
-                  <p className="text-xs text-zinc-500">
-                    Client details are auto-resolved for Jobber in the background.
-                  </p>
-                </div>
               </div>
 
               <div className="rounded-lg border border-zinc-200 bg-zinc-100/55 p-3">
@@ -1919,6 +1976,9 @@ function AiAssistantPage() {
                   disabled={!selectedClientId || isSavingDraft || isApprovingQuote}>
                   {isSavingDraft ? 'Saving...' : 'Save Draft'}
                 </Button>
+                {autoSaveStatus === 'saving' && <span className="text-xs text-zinc-400">Auto-saving...</span>}
+                {autoSaveStatus === 'saved' && <span className="text-xs text-emerald-500">Auto-saved ✓</span>}
+                {autoSaveStatus === 'error' && <span className="text-xs text-red-500">Auto-save failed — save manually</span>}
               </div>
               <Button
                 type="button"

@@ -239,7 +239,7 @@ function DashboardPage() {
         )}
         <aside
           className={cn(
-            'absolute inset-y-0 left-0 z-30 w-[250px] border-r border-zinc-200 bg-zinc-50/70 p-5 transition-transform lg:relative lg:z-10 lg:translate-x-0',
+            'absolute inset-y-0 left-0 z-30 flex w-[250px] flex-col border-r border-zinc-200 bg-zinc-50/70 p-5 transition-transform lg:relative lg:z-10 lg:translate-x-0',
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           )}>
           <p className="mb-6 text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Handy Dudes</p>
@@ -275,9 +275,12 @@ function DashboardPage() {
               </NavLink>
             ))}
           </nav>
-          <Button onClick={handleLogout} variant="outline" className="mt-6 w-full">
+          <Button onClick={handleLogout} variant="outline" className="mt-8 w-full">
             Logout
           </Button>
+          <p className="mt-auto pt-6 text-center text-xs text-zinc-400">
+            Handy Dudes Quoter by Ark Innovations v{__APP_VERSION__}
+          </p>
         </aside>
 
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden p-6 sm:p-8">
