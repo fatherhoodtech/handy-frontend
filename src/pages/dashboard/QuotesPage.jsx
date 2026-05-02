@@ -7,6 +7,13 @@ import { useNavigate } from 'react-router-dom'
 import { ClipboardList, FileText, CheckCircle, RefreshCw, Search, X } from 'lucide-react'
 import { cn, formatRelativeTime } from '@/lib/utils'
 
+function truncateToSentences(text, max = 3) {
+  if (!text) return text
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text]
+  if (sentences.length <= max) return text
+  return sentences.slice(0, max).join('').trim() + '…'
+}
+
 function normalizeMissingFields(readiness) {
   const fields = Array.isArray(readiness?.missingFields) ? readiness.missingFields : []
   return fields.map((value) => String(value || '').trim()).filter(Boolean)
@@ -500,8 +507,8 @@ function QuotesPage() {
       </div>
     {selectedQuote || isLoadingQuoteDetail ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-        <div className="w-full max-w-3xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl">
-          <div className="mb-4 flex items-center justify-between border-b border-zinc-100 pb-3">
+        <div className="flex w-full max-w-3xl max-h-[90vh] flex-col rounded-2xl border border-zinc-200 bg-white shadow-xl">
+          <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-5 py-4">
             <h2 className="text-lg font-semibold text-zinc-900">Quote Details</h2>
             <Button
               type="button"
@@ -514,6 +521,7 @@ function QuotesPage() {
               <X className="h-4 w-4" />
             </Button>
           </div>
+          <div className="overflow-y-auto px-5 pb-5 pt-4">
           {isLoadingQuoteDetail ? (
             <p className="text-sm text-zinc-500">Loading quote details...</p>
           ) : selectedQuote ? (
@@ -530,7 +538,7 @@ function QuotesPage() {
                     {selectedQuote.title || 'Untitled quote'}
                   </p>
                   <p className="mt-2 break-words text-sm leading-relaxed text-zinc-600">
-                    {selectedQuote.quoteDescription || '-'}
+                    {truncateToSentences(selectedQuote.quoteDescription) || '-'}
                   </p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2">
@@ -659,6 +667,7 @@ function QuotesPage() {
               </div>
             </div>
           ) : null}
+          </div>
         </div>
       </div>
     ) : null}
