@@ -3,32 +3,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { apiRequest } from '@/lib/apiClient'
-import { cn } from '@/lib/utils'
+import { avatarColor, cn, formatRelativeTime, getInitials } from '@/lib/utils'
 import { Search, TrendingUp, Users, UserPlus } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
-
-const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-violet-100 text-violet-700',
-  'bg-amber-100 text-amber-700',
-  'bg-rose-100 text-rose-700',
-  'bg-cyan-100 text-cyan-700',
-]
-
-function getInitials(name) {
-  return (name || '?')
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() || '')
-    .join('')
-}
-
-function avatarColor(name) {
-  const code = (name || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  return AVATAR_COLORS[code % AVATAR_COLORS.length]
-}
 
 function sourceBadge(source) {
   const s = (source || 'unknown').toLowerCase()
@@ -316,19 +293,6 @@ function ContactsPage() {
     }
   }
 
-  function formatRelativeTime(iso) {
-    const diffMs = Date.now() - new Date(iso).getTime()
-    if (!Number.isFinite(diffMs) || diffMs < 0) return 'just now'
-    const minute = 60 * 1000
-    const hour = 60 * minute
-    const day = 24 * hour
-    if (diffMs < minute) return 'just now'
-    if (diffMs < hour) return `${Math.floor(diffMs / minute)}m ago`
-    if (diffMs < day) return `${Math.floor(diffMs / hour)}h ago`
-    if (diffMs < 7 * day) return `${Math.floor(diffMs / day)}d ago`
-    return new Date(iso).toLocaleDateString()
-  }
-
   function closeDeleteModal() {
     if (isDeleting) return
     setDeleteModalContact(null)
@@ -409,57 +373,81 @@ function ContactsPage() {
       </div>
 
       {/* Main card */}
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <div className="rounded-xl border border-zinc-200 bg-white [overflow:clip]">
 
-        {/* Toolbar */}
-        <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:px-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-semibold text-zinc-900">
-              {hasActiveFilters ? 'Filtered contacts' : 'All contacts'}
-            </h2>
-            {!isLoading && (
-              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
-                {filteredContacts.length} {filteredContacts.length === 1 ? 'result' : 'results'}
-              </span>
-            )}
-          </div>
-          <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
-              <div className="relative min-w-[220px] flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search contacts..."
-                  className="h-9 w-full rounded-lg border-zinc-200 pl-8 text-sm"
-                />
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
-                  value={dateFilter}
-                  onChange={(event) => setDateFilter(event.target.value)}>
-                  <option value="all">All time</option>
-                  <option value="today">Today</option>
-                  <option value="7d">Last 7 days</option>
-                  <option value="30d">Last 30 days</option>
-                </select>
-                {hasActiveFilters ? (
-                  <button
-                    type="button"
-                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-                    onClick={() => { setSearch(''); setDateFilter('all') }}>
-                    Clear
-                  </button>
-                ) : null}
-              </div>
+        {/* Sticky banner: toolbar + column headers */}
+        <div className="sticky top-0 z-20 bg-white">
+          {/* Toolbar */}
+          <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-semibold text-zinc-900">
+                {hasActiveFilters ? 'Filtered contacts' : 'All contacts'}
+              </h2>
+              {!isLoading && (
+                <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
+                  {filteredContacts.length} {filteredContacts.length === 1 ? 'result' : 'results'}
+                </span>
+              )}
             </div>
-            <Button
-              type="button"
-              className="h-9 shrink-0 bg-sky-500 px-4 text-white hover:bg-sky-600"
-              onClick={openCreateModal}>
-                New Contact
-            </Button>
+            <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
+                <div className="relative min-w-[220px] flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search contacts..."
+                    className="h-9 w-full rounded-lg border-zinc-200 pl-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                    value={dateFilter}
+                    onChange={(event) => setDateFilter(event.target.value)}>
+                    <option value="all">All time</option>
+                    <option value="today">Today</option>
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                  </select>
+                  {hasActiveFilters ? (
+                    <button
+                      type="button"
+                      className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                      onClick={() => { setSearch(''); setDateFilter('all') }}>
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              <Button
+                type="button"
+                className="h-9 shrink-0 bg-sky-500 px-4 text-white hover:bg-sky-600"
+                onClick={openCreateModal}>
+                  New Contact
+              </Button>
+            </div>
+          </div>
+          {/* Column headers (outside <table> so they stay sticky with the toolbar) */}
+          <div className="hidden border-b border-zinc-200 md:block">
+            <table className="min-w-full table-fixed">
+              <colgroup>
+                <col className="w-[24%]" />
+                <col className="w-[22%]" />
+                <col className="w-[28%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Name</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Email / Phone</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Location</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Source</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Added</th>
+                </tr>
+              </thead>
+            </table>
           </div>
         </div>
 
@@ -524,16 +512,14 @@ function ContactsPage() {
             </div>
 
             <div className="hidden overflow-x-auto md:block">
-              <table className="min-w-full">
-                  <thead className="border-b border-zinc-200 bg-white">
-                    <tr>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Name</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Email / Phone</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Location</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Source</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Added</th>
-                    </tr>
-                  </thead>
+              <table className="min-w-full table-fixed">
+                  <colgroup>
+                    <col className="w-[24%]" />
+                    <col className="w-[22%]" />
+                    <col className="w-[28%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[13%]" />
+                  </colgroup>
                   <tbody className="divide-y divide-zinc-100">
                     {filteredContacts.map((contact) => {
                       const badge = sourceBadge(contact.source)

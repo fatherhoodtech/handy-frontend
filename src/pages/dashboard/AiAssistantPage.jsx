@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
+import { dollarsToCents } from '@/lib/pricingMoney'
 import { Bot, Copy, FileText, History, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -13,14 +14,6 @@ function toInt(value) {
 function centsToDollarInput(value) {
   const cents = toInt(value)
   return (cents / 100).toFixed(2)
-}
-
-function dollarsToCents(value) {
-  const raw = String(value ?? '').trim().replace(/[^0-9.]/g, '')
-  if (!raw) return 0
-  const parsed = Number.parseFloat(raw)
-  if (!Number.isFinite(parsed) || parsed < 0) return 0
-  return Math.round(parsed * 100)
 }
 
 function buildLaborLabel(trade, expertiseLevel) {

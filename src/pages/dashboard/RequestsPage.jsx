@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
+import { avatarColor, getInitials } from '@/lib/utils'
 import { Sparkles, X } from 'lucide-react'
 
 const STATUS_CONFIG = {
@@ -104,29 +105,6 @@ function renderThumbtackField(label, value) {
       <p className="text-sm text-zinc-800 whitespace-pre-wrap">{text}</p>
     </div>
   )
-}
-
-const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-violet-100 text-violet-700',
-  'bg-amber-100 text-amber-700',
-  'bg-rose-100 text-rose-700',
-  'bg-cyan-100 text-cyan-700',
-]
-
-function getInitials(name) {
-  return (name || '?')
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() || '')
-    .join('')
-}
-
-function avatarColor(name) {
-  const code = (name || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  return AVATAR_COLORS[code % AVATAR_COLORS.length]
 }
 
 function buildQuoteSeed(item) {
@@ -430,60 +408,87 @@ function RequestsPage() {
       </div>
 
       {/* Table + toolbar */}
-      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
-        <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:px-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-semibold text-zinc-900">
-              {hasActiveFilters ? 'Filtered requests' : 'All requests'}
-            </h2>
-            {!isLoading ? (
-              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
-                {filtered.length} {filtered.length === 1 ? 'result' : 'results'}
-              </span>
-            ) : null}
-          </div>
-          <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search requests..."
-                className="h-9 min-w-[220px] flex-1 rounded-lg border-zinc-200"
-              />
-              <select
-                className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="all">All statuses</option>
-                <option value="new">New</option>
-                <option value="contacted">Contacted</option>
-                <option value="qualified">Qualified</option>
-                <option value="quoted">Quoted</option>
-                <option value="won">Won</option>
-                <option value="lost">Lost</option>
-              </select>
-              <select
-                className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}>
-                <option value="all">All time</option>
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-              </select>
-              {hasActiveFilters ? (
-                <button
-                  type="button"
-                  className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-                  onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
-                  Clear
-                </button>
+      <div className="rounded-lg border border-zinc-200 bg-white [overflow:clip]">
+        {/* Sticky banner: toolbar + column headers */}
+        <div className="sticky top-0 z-20 bg-white">
+          {/* Toolbar */}
+          <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-semibold text-zinc-900">
+                {hasActiveFilters ? 'Filtered requests' : 'All requests'}
+              </h2>
+              {!isLoading ? (
+                <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
+                  {filtered.length} {filtered.length === 1 ? 'result' : 'results'}
+                </span>
               ) : null}
             </div>
-            <Button type="button" className="h-9 bg-sky-500 text-white hover:bg-sky-600" onClick={openManualCreateForm}>
-              Create request
-            </Button>
+            <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search requests..."
+                  className="h-9 min-w-[220px] flex-1 rounded-lg border-zinc-200"
+                />
+                <select
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="all">All statuses</option>
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="qualified">Qualified</option>
+                  <option value="quoted">Quoted</option>
+                  <option value="won">Won</option>
+                  <option value="lost">Lost</option>
+                </select>
+                <select
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}>
+                  <option value="all">All time</option>
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                </select>
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                    onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+              <Button type="button" className="h-9 bg-sky-500 text-white hover:bg-sky-600" onClick={openManualCreateForm}>
+                Create request
+              </Button>
+            </div>
           </div>
-      </div>
+          {/* Column headers (outside <table> so they stay sticky with the toolbar) */}
+          <div className="hidden border-b border-zinc-200 md:block">
+            <table className="min-w-full table-fixed">
+              <colgroup>
+                <col className="w-[17%]" />
+                <col className="w-[22%]" />
+                <col className="w-[22%]" />
+                <col className="w-[14%]" />
+                <col className="w-[13%]" />
+                <col className="w-[12%]" />
+              </colgroup>
+              <thead>
+                <tr className="text-left text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  <th className="px-4 py-3">Client</th>
+                  <th className="px-4 py-3">Title</th>
+                  <th className="px-4 py-3">Property</th>
+                  <th className="px-4 py-3">Contact</th>
+                  <th className="px-4 py-3">Requested</th>
+                  <th className="px-4 py-3 text-right">AI quote</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+        </div>
 
       {errorMessage && (
           <div className="border-b border-red-100 bg-red-50 px-5 py-3">
@@ -542,17 +547,15 @@ function RequestsPage() {
             </div>
 
             <div className="hidden overflow-x-auto md:block">
-            <table className="min-w-full divide-y divide-zinc-100 text-sm">
-              <thead>
-                <tr className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                  <th className="px-4 py-3">Client</th>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Property</th>
-                  <th className="px-4 py-3">Contact</th>
-                  <th className="px-4 py-3">Requested</th>
-                  <th className="px-4 py-3 text-right">AI quote</th>
-                </tr>
-              </thead>
+            <table className="min-w-full table-fixed divide-y divide-zinc-100 text-sm">
+              <colgroup>
+                <col className="w-[17%]" />
+                <col className="w-[22%]" />
+                <col className="w-[22%]" />
+                <col className="w-[14%]" />
+                <col className="w-[13%]" />
+                <col className="w-[12%]" />
+              </colgroup>
               <tbody className="divide-y divide-zinc-100">
                   {filtered.map((item, index) => (
                   <tr

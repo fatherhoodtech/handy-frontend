@@ -9,3 +9,7 @@ export function dollarsToCents(value) {
   if (!Number.isFinite(parsed) || parsed < 0) return 0
   return Math.round(parsed * 100)
 }
+
+export function formatCentsToDollars(cents) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100)
+}

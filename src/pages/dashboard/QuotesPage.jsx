@@ -1,27 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { apiRequest } from '@/lib/apiClient'
+import { formatCentsToDollars } from '@/lib/pricingMoney'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, FileText, CheckCircle, RefreshCw, Search, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
-
-function formatMoneyFromCents(cents) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100)
-}
-
-function formatRelativeTime(iso) {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  if (!Number.isFinite(diffMs) || diffMs < 0) return 'just now'
-  const minute = 60 * 1000
-  const hour = 60 * minute
-  const day = 24 * hour
-  if (diffMs < minute) return 'just now'
-  if (diffMs < hour) return `${Math.floor(diffMs / minute)}m ago`
-  if (diffMs < day) return `${Math.floor(diffMs / hour)}h ago`
-  if (diffMs < 7 * day) return `${Math.floor(diffMs / day)}d ago`
-  return new Date(iso).toLocaleDateString()
-}
+import { cn, formatRelativeTime } from '@/lib/utils'
 
 function normalizeMissingFields(readiness) {
   const fields = Array.isArray(readiness?.missingFields) ? readiness.missingFields : []
@@ -302,57 +286,83 @@ function QuotesPage() {
       </div>
 
       {/* Main card */}
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <div className="rounded-xl border border-zinc-200 bg-white [overflow:clip]">
 
-        {/* Toolbar */}
-        <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:px-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-semibold text-zinc-900">
-              {hasActiveFilters ? 'Filtered quotes' : 'All quotes'}
-            </h2>
-            {!isLoading && (
-              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
-                {filteredQuotes.length} {filteredQuotes.length === 1 ? 'result' : 'results'}
-              </span>
-            )}
+        {/* Sticky banner: toolbar + column headers */}
+        <div className="sticky top-0 z-20 bg-white">
+          {/* Toolbar */}
+          <div className="flex flex-col gap-3 border-b border-zinc-200 px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-semibold text-zinc-900">
+                {hasActiveFilters ? 'Filtered quotes' : 'All quotes'}
+              </h2>
+              {!isLoading && (
+                <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
+                  {filteredQuotes.length} {filteredQuotes.length === 1 ? 'result' : 'results'}
+                </span>
+              )}
+            </div>
+            <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
+                <div className="relative min-w-[220px] flex-1">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search quotes..."
+                    className="h-9 w-full rounded-lg border-zinc-200 pl-8 text-sm"
+                  />
+                </div>
+                <select
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}>
+                  <option value="all">All statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="approved">Approved</option>
+                  <option value="synced">Synced to Jobber</option>
+                </select>
+                <select
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                  value={dateFilter}
+                  onChange={(event) => setDateFilter(event.target.value)}>
+                  <option value="all">All time</option>
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                </select>
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                    onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+            </div>
           </div>
-          <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1">
-              <div className="relative min-w-[220px] flex-1">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search quotes..."
-                  className="h-9 w-full rounded-lg border-zinc-200 pl-8 text-sm"
-              />
-            </div>
-              <select
-                className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}>
-                <option value="all">All statuses</option>
-                <option value="draft">Draft</option>
-                <option value="approved">Approved</option>
-                <option value="synced">Synced to Jobber</option>
-              </select>
-            <select
-                className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
-              value={dateFilter}
-              onChange={(event) => setDateFilter(event.target.value)}>
-              <option value="all">All time</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-            </select>
-              {hasActiveFilters ? (
-              <button
-                type="button"
-                  className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-                onClick={() => { setSearch(''); setStatusFilter('all'); setDateFilter('all') }}>
-                  Clear
-              </button>
-              ) : null}
-            </div>
+          {/* Column headers (outside <table> so they stay sticky with the toolbar) */}
+          <div className="hidden border-b border-zinc-200 md:block">
+            <table className="min-w-full table-fixed">
+              <colgroup>
+                <col className="w-[18%]" />
+                <col className="w-[24%]" />
+                <col className="w-[14%]" />
+                <col className="w-[14%]" />
+                <col className="w-[15%]" />
+                <col className="w-[15%]" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Client</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Quote Title</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Price</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Jobber</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Created</th>
+                </tr>
+              </thead>
+            </table>
           </div>
         </div>
 
@@ -410,7 +420,7 @@ function QuotesPage() {
                   </div>
                   {quote.quoteDescription ? <p className="mt-1 line-clamp-2 text-sm text-zinc-600">{quote.quoteDescription}</p> : null}
                   <div className="mt-2 flex items-center justify-between">
-                    <p className="text-sm font-medium text-zinc-900">{formatMoneyFromCents(quote.amountCents)}</p>
+                    <p className="text-sm font-medium text-zinc-900">{formatCentsToDollars(quote.amountCents)}</p>
                     <p className="text-sm text-zinc-500">{formatRelativeTime(quote.createdAt)}</p>
                   </div>
                 </button>
@@ -418,17 +428,15 @@ function QuotesPage() {
             </div>
 
             <div className="hidden overflow-x-auto md:block">
-            <table className="min-w-full">
-              <thead className="border-b border-zinc-200 bg-white">
-                <tr>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Client</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Quote Title</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Price</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Jobber</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Created</th>
-                </tr>
-              </thead>
+            <table className="min-w-full table-fixed">
+              <colgroup>
+                <col className="w-[18%]" />
+                <col className="w-[24%]" />
+                <col className="w-[14%]" />
+                <col className="w-[14%]" />
+                <col className="w-[15%]" />
+                <col className="w-[15%]" />
+              </colgroup>
               <tbody className="divide-y divide-zinc-100">
                 {filteredQuotes.map((quote, index) => (
                   <tr
@@ -443,7 +451,7 @@ function QuotesPage() {
                       ) : null}
                     </td>
                     <td className="px-5 py-3.5 text-sm font-medium text-zinc-900">
-                      {formatMoneyFromCents(quote.amountCents)}
+                      {formatCentsToDollars(quote.amountCents)}
                     </td>
                     <td className="px-5 py-3.5">
                       <span className={cn(
@@ -531,7 +539,7 @@ function QuotesPage() {
                     </div>
                     <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-2">
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Price</p>
-                      <p className="mt-0.5 text-sm font-medium text-zinc-800">{formatMoneyFromCents(selectedQuote.amountCents)}</p>
+                      <p className="mt-0.5 text-sm font-medium text-zinc-800">{formatCentsToDollars(selectedQuote.amountCents)}</p>
                     </div>
                   </div>
                   <p className="mt-2 text-xs text-zinc-500">Created: {new Date(selectedQuote.createdAt).toLocaleString()}</p>
@@ -586,8 +594,8 @@ function QuotesPage() {
                           <tr key={`${lineLabel}-${idx}`}>
                             <td className="px-3 py-2 text-sm text-zinc-800">{lineLabel}</td>
                             <td className="px-3 py-2 text-sm text-zinc-800">{item.quantity}</td>
-                            <td className="px-3 py-2 text-sm text-zinc-800">{formatMoneyFromCents(item.unitPriceCents)}</td>
-                            <td className="px-3 py-2 text-sm text-zinc-800">{formatMoneyFromCents(item.totalPriceCents)}</td>
+                            <td className="px-3 py-2 text-sm text-zinc-800">{formatCentsToDollars(item.unitPriceCents)}</td>
+                            <td className="px-3 py-2 text-sm text-zinc-800">{formatCentsToDollars(item.totalPriceCents)}</td>
                           </tr>
                           )
                         })}

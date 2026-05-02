@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react'
 import { apiRequest } from '@/lib/apiClient'
+import { formatCentsToDollars } from '@/lib/pricingMoney'
 import { CheckCircle, DollarSign, FileText, ListFilter, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-
-function formatMoney(cents) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100)
-}
 
 function StatCard({ label, value, sub, icon: Icon, iconClass, borderClass, onClick }) {
   return (
@@ -109,7 +106,7 @@ function OverviewPage() {
         />
         <StatCard
           label="Revenue (30 days)"
-          value={isLoading ? '—' : formatMoney(metrics.approvedValueTodayCents)}
+          value={isLoading ? '—' : formatCentsToDollars(metrics.approvedValueTodayCents)}
           sub="30-day tracking coming soon"
           icon={DollarSign}
           iconClass="bg-violet-50 text-violet-600"
@@ -152,7 +149,7 @@ function OverviewPage() {
               <span className="rounded-lg bg-violet-50 p-2 text-violet-600"><DollarSign className="h-4 w-4" /></span>
               <div>
                 <p className="text-xs text-zinc-500">Revenue Today</p>
-                <p className="text-2xl font-bold text-zinc-900">{isLoading ? '—' : formatMoney(metrics.approvedValueTodayCents)}</p>
+                <p className="text-2xl font-bold text-zinc-900">{isLoading ? '—' : formatCentsToDollars(metrics.approvedValueTodayCents)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4 sm:col-span-2">

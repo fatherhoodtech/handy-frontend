@@ -173,51 +173,74 @@ export default function MaterialsCatalogPage() {
         <p className="text-sm text-zinc-500">Loading materials catalog...</p>
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <div className="relative min-w-[220px] flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-              <Input
-                value={materialsSearch}
-                onChange={(e) => setMaterialsSearch(e.target.value)}
-                placeholder="Smart search materials..."
-                className="pl-8"
-              />
+          <div className="rounded-xl border border-zinc-200 [overflow:clip]">
+            {/* Sticky banner: toolbar + column headers */}
+            <div className="sticky top-0 z-20 bg-white">
+              {/* Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 px-5 py-4">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  <div className="relative min-w-[220px] flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+                    <Input
+                      value={materialsSearch}
+                      onChange={(e) => setMaterialsSearch(e.target.value)}
+                      placeholder="Smart search materials..."
+                      className="pl-8"
+                    />
+                  </div>
+                  <select
+                    className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}>
+                    <option value="all">All status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                  <select
+                    className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
+                    value={uomFilter}
+                    onChange={(e) => setUomFilter(e.target.value)}>
+                    <option value="all">All UOM</option>
+                    {uomOptions.map((uom) => (
+                      <option key={uom} value={uom}>{uom}</option>
+                    ))}
+                  </select>
+                  <select
+                    className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}>
+                    <option value="name-asc">Sort: Name A-Z</option>
+                    <option value="name-desc">Sort: Name Z-A</option>
+                    <option value="price-asc">Sort: Price Low-High</option>
+                    <option value="price-desc">Sort: Price High-Low</option>
+                    <option value="uom-asc">Sort: UOM A-Z</option>
+                    <option value="uom-desc">Sort: UOM Z-A</option>
+                  </select>
+                </div>
+                <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" onClick={() => setShowCreate(true)}>
+                  Create material
+                </Button>
+              </div>
+              {/* Column headers (outside <table> so they stay sticky with the toolbar) */}
+              <div className="hidden border-b border-zinc-200 md:block">
+                <table className="min-w-full table-fixed">
+                  <colgroup>
+                    <col className="w-[40%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[20%]" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Material</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">UOM</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Price</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
             </div>
-            <select
-              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="all">All status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            <select
-              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
-              value={uomFilter}
-              onChange={(e) => setUomFilter(e.target.value)}>
-              <option value="all">All UOM</option>
-              {uomOptions.map((uom) => (
-                <option key={uom} value={uom}>{uom}</option>
-              ))}
-            </select>
-            <select
-              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}>
-              <option value="name-asc">Sort: Name A-Z</option>
-              <option value="name-desc">Sort: Name Z-A</option>
-              <option value="price-asc">Sort: Price Low-High</option>
-              <option value="price-desc">Sort: Price High-Low</option>
-              <option value="uom-asc">Sort: UOM A-Z</option>
-              <option value="uom-desc">Sort: UOM Z-A</option>
-            </select>
-            </div>
-            <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" onClick={() => setShowCreate(true)}>
-              Create material
-            </Button>
-          </div>
-          <div className="overflow-hidden rounded-xl border border-zinc-200">
             <div className="divide-y divide-zinc-100 md:hidden">
               {filteredCatalog.length === 0 ? (
                 <div className="px-5 py-8 text-center text-sm text-zinc-400">
@@ -246,15 +269,13 @@ export default function MaterialsCatalogPage() {
             </div>
 
             <div className="hidden md:block">
-              <table className="min-w-full">
-                <thead className="border-b border-zinc-200 bg-white">
-                  <tr>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Material</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">UOM</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Price</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
-                  </tr>
-                </thead>
+              <table className="min-w-full table-fixed">
+                <colgroup>
+                  <col className="w-[40%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[20%]" />
+                </colgroup>
                 <tbody className="divide-y divide-zinc-100">
                   {filteredCatalog.length === 0 ? (
                     <tr>
