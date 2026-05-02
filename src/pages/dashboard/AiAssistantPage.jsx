@@ -281,14 +281,39 @@ function parseAssistantStructured(text) {
   }
 }
 
+function useTypingEffect(text, enabled) {
+  const [shown, setShown] = useState(0)
+
+  useEffect(() => {
+    if (!enabled || !text) return
+    setShown(0)
+    const TICK_MS = 30
+    const DURATION_MS = 1800
+    const charsPerTick = Math.max(1, Math.ceil(text.length / (DURATION_MS / TICK_MS)))
+    let pos = 0
+    const id = setInterval(() => {
+      pos = Math.min(pos + charsPerTick, text.length)
+      setShown(pos)
+      if (pos >= text.length) clearInterval(id)
+    }, TICK_MS)
+    return () => clearInterval(id)
+  }, [text, enabled])
+
+  return enabled ? shown : text.length
+}
+
 function AssistantMessageContent({
   message,
+  isTyping,
   quoteDraft,
   setQuoteDraft,
   recalcDraftFn,
   setActionNotice,
 }) {
   const [showRaw, setShowRaw] = useState(false)
+  const displayedLength = useTypingEffect(message.text, isTyping && message.role === 'assistant')
+  const displayedText = message.text.slice(0, displayedLength)
+  const isAnimating = isTyping && message.role === 'assistant' && displayedLength < message.text.length
 
   if (message.role !== 'assistant') {
     return <div className="whitespace-pre-wrap break-words">{message.text}</div>
@@ -297,7 +322,12 @@ function AssistantMessageContent({
   const structured = parseAssistantStructured(message.text)
 
   if (structured.kind === 'text') {
-    return <div className="whitespace-pre-wrap break-words">{message.text}</div>
+    return (
+      <div className="whitespace-pre-wrap break-words">
+        {displayedText}
+        {isAnimating && <span className="ml-px animate-pulse font-thin text-zinc-400">|</span>}
+      </div>
+    )
   }
 
   const copyRaw = async () => {
@@ -1312,7 +1342,11 @@ function AiAssistantPage() {
         method: 'POST',
         body: JSON.stringify({ prompt: trimmed }),
       })
-      setMessages(normalizeMessages(response?.messages))
+      const normalized = normalizeMessages(response?.messages)
+      const lastIdx = normalized.length - 1
+      setMessages(normalized.map((msg, i) =>
+        i === lastIdx && msg.role === 'assistant' ? { ...msg, _isNew: true } : msg
+      ))
       if (response?.quoteDraft) {
         setQuoteDraft(recalcDraft(response.quoteDraft))
       }
@@ -1942,20 +1976,34 @@ function AiAssistantPage() {
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`max-w-[90%] rounded-lg px-3 py-2 text-sm ${
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                       message.role === 'user'
-                        ? 'ml-auto bg-sky-500 text-white'
+                        ? 'bg-sky-500 text-white'
                         : 'bg-white text-zinc-800 border border-zinc-200'
                     }`}>
-                    <AssistantMessageContent
-                      message={message}
-                      quoteDraft={quoteDraft}
-                      setQuoteDraft={setQuoteDraft}
-                      recalcDraftFn={recalcDraft}
-                      setActionNotice={setActionNotice}
-                    />
+                      <AssistantMessageContent
+                        message={message}
+                        isTyping={Boolean(message._isNew)}
+                        quoteDraft={quoteDraft}
+                        setQuoteDraft={setQuoteDraft}
+                        recalcDraftFn={recalcDraft}
+                        setActionNotice={setActionNotice}
+                      />
+                    </div>
                   </div>
                 ))}
+                {isSending ? (
+                  <div className="flex justify-start">
+                    <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                      <div className="flex items-center gap-1">
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-zinc-400" style={{ animationDelay: '0ms' }} />
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-zinc-400" style={{ animationDelay: '160ms' }} />
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-zinc-400" style={{ animationDelay: '320ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 {isLoadingThread ? <p className="text-xs text-zinc-500">Loading conversation...</p> : null}
                 <div ref={chatBottomRef} />
               </div>
