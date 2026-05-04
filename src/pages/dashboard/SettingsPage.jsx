@@ -256,8 +256,8 @@ function SettingsPage() {
               className={cn(
                 'inline-flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors',
                 activeTab === tab.id
-                  ? 'border-sky-300 bg-sky-50 text-sky-700'
-                  : 'border-sky-200 bg-white text-zinc-700 hover:border-sky-300 hover:bg-sky-50'
+                  ? 'border-[#262742] bg-[#262742]/10 text-[#1a1b30]'
+                  : 'border-[#262742]/30 bg-white text-zinc-700 hover:border-[#262742] hover:bg-[#262742]/10'
               )}>
               <tab.icon className="h-4 w-4 shrink-0" />
               {tab.label}
@@ -266,7 +266,7 @@ function SettingsPage() {
         </nav>
       </div>
 
-      <div className="min-w-0 rounded-xl border border-sky-200 bg-white p-6">
+      <div className="min-w-0 rounded-xl border border-[#262742]/30 bg-white p-6">
         {error && (
           <div className="mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
@@ -286,7 +286,7 @@ function SettingsPage() {
           <div>
             <SectionHeader title="Account" description="Manage your profile and security settings." />
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border border-sky-200 bg-zinc-50 p-4">
+              <div className="rounded-xl border border-[#262742]/30 bg-zinc-50 p-4">
                 <p className="text-sm font-semibold text-zinc-900">Profile Information</p>
                 <p className="mt-1 text-xs text-zinc-500">Keep your account profile up to date.</p>
                 <div className="mt-3 space-y-3">
@@ -313,7 +313,7 @@ function SettingsPage() {
                   </Button>
                 </div>
               </div>
-              <div className="rounded-xl border border-sky-200 bg-zinc-50 p-4">
+              <div className="rounded-xl border border-[#262742]/30 bg-zinc-50 p-4">
                 <p className="text-sm font-semibold text-zinc-900">Change Password</p>
                 <p className="mt-1 text-xs text-zinc-500">Use a strong password with at least 8 characters.</p>
                 <div className="mt-3 space-y-3">
@@ -352,7 +352,7 @@ function SettingsPage() {
                 {usersLoadError}
               </div>
             ) : null}
-            <div className="rounded-xl border border-sky-200 bg-zinc-50 p-4">
+            <div className="rounded-xl border border-[#262742]/30 bg-zinc-50 p-4">
               <p className="text-sm font-semibold text-zinc-900">Create User</p>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <Input
@@ -367,7 +367,7 @@ function SettingsPage() {
                   onChange={(e) => setNewUser((c) => ({ ...c, password: e.target.value }))}
                 />
                 <select
-                  className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800 outline-none focus:border-sky-400"
+                  className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800 outline-none focus:border-[#262742]"
                   value={newUser.role}
                   onChange={(e) => setNewUser((c) => ({ ...c, role: e.target.value }))}>
                   <option value="sales">Salesperson</option>
@@ -378,7 +378,7 @@ function SettingsPage() {
                 </Button>
               </div>
             </div>
-            <div className="mt-4 overflow-hidden rounded-xl border border-sky-200">
+            <div className="mt-4 overflow-hidden rounded-xl border border-[#262742]/30">
               <table className="min-w-full">
                 <thead className="border-b border-zinc-200 bg-white">
                   <tr>
@@ -401,7 +401,7 @@ function SettingsPage() {
                       <td className="px-4 py-3 text-sm">
                         <span className={cn(
                           'inline-flex rounded-full border px-2 py-0.5 text-xs font-medium',
-                          u.isActive ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-zinc-200 bg-zinc-50 text-zinc-500'
+                          u.isActive ? 'border-[#262742]/30 bg-[#262742]/10 text-[#1a1b30]' : 'border-zinc-200 bg-zinc-50 text-zinc-500'
                         )}>
                           {u.isActive ? 'Active' : 'Inactive'}
                         </span>
@@ -480,7 +480,7 @@ function SettingsPage() {
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-zinc-600">Default Quote Terms</label>
                 <textarea
-                  className="min-h-28 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-sky-400"
+                  className="min-h-28 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-[#262742]"
                   value={quoteDefaults.defaultQuoteTerms}
                   onChange={(e) =>
                     setQuoteDefaults((c) => ({ ...c, defaultQuoteTerms: e.target.value }))

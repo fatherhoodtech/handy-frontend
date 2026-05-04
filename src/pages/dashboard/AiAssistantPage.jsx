@@ -371,7 +371,7 @@ function AssistantMessageContent({
 
       {structured.kind === 'quote_preview' && displayDraft ? (
         <div className="rounded-xl border border-zinc-200 bg-white p-3 text-zinc-900">
-          <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Quote preview</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#1a1b30]">Quote preview</p>
           {displayDraft.title ? (
             <p className="mt-1 text-sm font-semibold text-zinc-900">{displayDraft.title}</p>
           ) : null}
@@ -1584,9 +1584,9 @@ function AiAssistantPage() {
     <>
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       {location.state?.jobberRequestSeed ? (
-        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5">
-          <FileText className="h-4 w-4 shrink-0 text-sky-500" />
-          <p className="text-sm text-sky-800">
+        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-[#262742]/30 bg-[#262742]/10 px-4 py-2.5">
+          <FileText className="h-4 w-4 shrink-0 text-[#262742]" />
+          <p className="text-sm text-[#1a1b30]">
             Building quote for:{' '}
             <span className="font-semibold">
               {String(location.state.jobberRequestSeed.title ?? '').trim() || 'this request'}
@@ -1597,7 +1597,7 @@ function AiAssistantPage() {
       <div className="flex min-h-0 flex-1 flex-row gap-4 overflow-hidden">
         <div className="flex h-full min-h-0 w-1/2 flex-col rounded-xl border border-zinc-200 bg-white">
           <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 px-5 py-4">
-            <FileText className="h-4 w-4 shrink-0 text-sky-500" />
+            <FileText className="h-4 w-4 shrink-0 text-[#262742]" />
             <div>
               <h2 className="text-sm font-semibold text-zinc-900">Quote Builder</h2>
               <p className="text-xs text-zinc-500">Edit before saving or sending.</p>
@@ -1971,7 +1971,7 @@ function AiAssistantPage() {
               </div>
               <Button
                 type="button"
-                className="bg-sky-500 text-white hover:bg-sky-600"
+                className="bg-[#262742] text-white hover:bg-[#1a1b30]"
                 onClick={handleApproveQuote}
                 disabled={!selectedClientId || isApprovingQuote || isSavingDraft}>
                 {isApprovingQuote ? 'Approving...' : 'Approve & Send'}
@@ -1983,7 +1983,7 @@ function AiAssistantPage() {
         <div className="flex h-full min-h-0 w-1/2 flex-col rounded-xl border border-zinc-200 bg-white">
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-100 px-5 py-4">
             <div className="flex items-center gap-2">
-              <Bot className="h-4 w-4 shrink-0 text-sky-500" />
+              <Bot className="h-4 w-4 shrink-0 text-[#262742]" />
               <div>
                 <h2 className="text-sm font-semibold text-zinc-900">AI Assistant</h2>
                 <p className="text-xs text-zinc-500">Ask for pricing, adjustments, and suggestions.</p>
@@ -1994,14 +1994,14 @@ function AiAssistantPage() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+                className="border-[#262742]/30 text-[#1a1b30] hover:border-[#262742] hover:bg-[#262742]/10"
                 onClick={() => setHistoryOpen(true)}>
                 <History className="h-4 w-4" />
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                className="border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+                className="border-[#262742]/30 text-[#1a1b30] hover:border-[#262742] hover:bg-[#262742]/10"
                 onClick={handleNewChat}
                 disabled={isCreatingNewChat}>
                 {isCreatingNewChat ? 'Creating...' : 'New Chat'}
@@ -2013,7 +2013,7 @@ function AiAssistantPage() {
               <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{chatError}</p>
             ) : null}
             {actionNotice ? (
-              <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700">
+              <p className="rounded-md border border-[#262742]/30 bg-[#262742]/10 px-3 py-2 text-xs text-[#1a1b30]">
                 {actionNotice}
               </p>
             ) : null}
@@ -2028,7 +2028,7 @@ function AiAssistantPage() {
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                       message.role === 'user'
-                        ? 'bg-sky-500 text-white'
+                        ? 'bg-[#262742] text-white'
                         : 'bg-white text-zinc-800 border border-zinc-200'
                     }`}>
                       <AssistantMessageContent
@@ -2106,7 +2106,7 @@ function AiAssistantPage() {
           role="dialog"
           aria-modal="true">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 shrink-0 text-sky-500" />
+            <FileText className="h-4 w-4 shrink-0 text-[#262742]" />
             <h3 className="text-base font-bold text-zinc-900">Unsaved quote in progress</h3>
           </div>
           <p className="mt-3 text-sm text-zinc-600">
@@ -2129,7 +2129,7 @@ function AiAssistantPage() {
             </Button>
             <Button
               type="button"
-              className="bg-sky-500 text-white hover:bg-sky-600"
+              className="bg-[#262742] text-white hover:bg-[#1a1b30]"
               onClick={handleSaveDraftAndContinue}
               disabled={isHandoffSaving}>
               {isHandoffSaving ? 'Saving...' : 'Save Draft & Continue'}
@@ -2145,7 +2145,7 @@ function AiAssistantPage() {
           role="dialog"
           aria-modal="true">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 shrink-0 text-sky-500" />
+            <FileText className="h-4 w-4 shrink-0 text-[#262742]" />
             <h3 className="text-base font-bold text-zinc-900">Unsaved quote in progress</h3>
           </div>
           <p className="mt-3 text-sm text-zinc-600">
@@ -2168,7 +2168,7 @@ function AiAssistantPage() {
             </Button>
             <Button
               type="button"
-              className="bg-sky-500 text-white hover:bg-sky-600"
+              className="bg-[#262742] text-white hover:bg-[#1a1b30]"
               onClick={handleContactHandoffSaveDraftAndContinue}
               disabled={isHandoffSaving}>
               {isHandoffSaving ? 'Saving...' : 'Save Draft & Continue'}
@@ -2182,7 +2182,7 @@ function AiAssistantPage() {
         <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-4 shadow-lg">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <History className="h-4 w-4 text-sky-500" />
+              <History className="h-4 w-4 text-[#262742]" />
               <h2 className="text-sm font-semibold text-zinc-900">Past Chats</h2>
             </div>
             <button

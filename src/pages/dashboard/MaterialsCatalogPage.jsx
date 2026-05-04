@@ -217,7 +217,7 @@ export default function MaterialsCatalogPage() {
                     <option value="uom-desc">Sort: UOM Z-A</option>
                   </select>
                 </div>
-                <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" onClick={() => setShowCreate(true)}>
+                <Button type="button" className="bg-[#262742] text-white hover:bg-[#1a1b30]" onClick={() => setShowCreate(true)}>
                   Create material
                 </Button>
               </div>
@@ -330,7 +330,7 @@ export default function MaterialsCatalogPage() {
                   <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
                   <Button
                     type="button"
-                    className="bg-sky-500 text-white hover:bg-sky-600"
+                    className="bg-[#262742] text-white hover:bg-[#1a1b30]"
                     onClick={async () => {
                       await createCatalogRow()
                       setShowCreate(false)
@@ -373,7 +373,7 @@ export default function MaterialsCatalogPage() {
                   <Button type="button" variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
                   <Button
                     type="button"
-                    className="bg-sky-500 text-white hover:bg-sky-600"
+                    className="bg-[#262742] text-white hover:bg-[#1a1b30]"
                     onClick={async () => {
                       await updateCatalogItem()
                     }}>
@@ -394,7 +394,7 @@ export default function MaterialsCatalogPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+                    className="border-[#262742]/30 text-[#1a1b30] hover:border-[#262742] hover:bg-[#262742]/10"
                     onClick={() => {
                       openUpdateModal(selectedItem)
                       setSelectedItem(null)

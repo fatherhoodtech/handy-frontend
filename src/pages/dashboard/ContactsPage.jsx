@@ -9,7 +9,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 function sourceBadge(source) {
   const s = (source || 'unknown').toLowerCase()
-  if (s === 'jobber') return { label: 'Jobber', dot: 'bg-sky-500', className: 'bg-sky-50 text-sky-700 border-sky-200' }
+  if (s === 'jobber') return { label: 'Jobber', dot: 'bg-[#262742]', className: 'bg-[#262742]/10 text-[#1a1b30] border-[#262742]/30' }
   if (s === 'thumbtack') return { label: 'Thumbtack', dot: 'bg-amber-500', className: 'bg-amber-50 text-amber-700 border-amber-200' }
   if (s === 'manual') return { label: 'Active', dot: 'bg-emerald-500', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
   if (s === 'unknown') return { label: 'Unknown', dot: 'bg-zinc-400', className: 'bg-zinc-50 text-zinc-600 border-zinc-200' }
@@ -337,7 +337,7 @@ function ContactsPage() {
               </p>
               <p className="mt-0.5 text-xs text-zinc-400">Past 7 days</p>
             </div>
-            <span className="rounded-lg bg-sky-50 p-2 text-sky-600">
+            <span className="rounded-lg bg-[#262742]/10 p-2 text-[#1a1b30]">
               <UserPlus className="h-4 w-4" />
             </span>
           </div>
@@ -402,7 +402,7 @@ function ContactsPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <select
-                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-[#262742]"
                     value={dateFilter}
                     onChange={(event) => setDateFilter(event.target.value)}>
                     <option value="all">All time</option>
@@ -422,7 +422,7 @@ function ContactsPage() {
               </div>
               <Button
                 type="button"
-                className="h-9 shrink-0 bg-sky-500 px-4 text-white hover:bg-sky-600"
+                className="h-9 shrink-0 bg-[#262742] px-4 text-white hover:bg-[#1a1b30]"
                 onClick={openCreateModal}>
                   New Contact
               </Button>
@@ -787,7 +787,7 @@ function ContactsPage() {
               <p className="text-xs text-zinc-500">First name + last name and at least one of email or phone are required.</p>
               <div className="sticky bottom-0 flex justify-end gap-2 border-t border-zinc-100 bg-white pt-3">
                 <Button type="button" variant="outline" onClick={closeCreateModal} disabled={isSubmitting}>Cancel</Button>
-                <Button type="submit" className="bg-sky-500 text-white hover:bg-sky-600" disabled={isSubmitting}>
+                <Button type="submit" className="bg-[#262742] text-white hover:bg-[#1a1b30]" disabled={isSubmitting}>
                   {isSubmitting ? 'Creating...' : 'Create Contact'}
                 </Button>
               </div>

@@ -216,7 +216,7 @@ export default function LaborPricingPage() {
                     <option value="rate-desc">Sort: Rate High-Low</option>
                   </select>
                 </div>
-                <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" onClick={() => setShowCreate(true)}>
+                <Button type="button" className="bg-[#262742] text-white hover:bg-[#1a1b30]" onClick={() => setShowCreate(true)}>
                   Create labor rate
                 </Button>
               </div>
@@ -315,7 +315,7 @@ export default function LaborPricingPage() {
                     onChange={(e) => setLaborForm((c) => ({ ...c, trade: e.target.value }))}
                   />
                   <select
-                    className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800 outline-none focus:border-sky-400"
+                    className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800 outline-none focus:border-[#262742]"
                     value={laborForm.expertiseLevel}
                     onChange={(e) => setLaborForm((c) => ({ ...c, expertiseLevel: e.target.value }))}>
                     <option value="standard">Standard</option>
@@ -331,7 +331,7 @@ export default function LaborPricingPage() {
                   <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
                   <Button
                     type="button"
-                    className="bg-sky-500 text-white hover:bg-sky-600"
+                    className="bg-[#262742] text-white hover:bg-[#1a1b30]"
                     onClick={async () => {
                       await createLaborRow()
                       setShowCreate(false)
@@ -376,7 +376,7 @@ export default function LaborPricingPage() {
                   <Button type="button" variant="outline" onClick={() => setEditingRow(null)}>Cancel</Button>
                   <Button
                     type="button"
-                    className="bg-sky-500 text-white hover:bg-sky-600"
+                    className="bg-[#262742] text-white hover:bg-[#1a1b30]"
                     onClick={async () => {
                       await updateLaborRow()
                     }}>
@@ -397,7 +397,7 @@ export default function LaborPricingPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="border-sky-200 text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+                    className="border-[#262742]/30 text-[#1a1b30] hover:border-[#262742] hover:bg-[#262742]/10"
                     onClick={() => {
                       openUpdateModal(selectedRow)
                       setSelectedRow(null)

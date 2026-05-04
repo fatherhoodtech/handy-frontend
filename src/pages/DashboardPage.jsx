@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   ListFilter,
+  LogOut,
   Mail,
   Menu,
   Package,
@@ -12,6 +13,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react'
+import handyDudesLogo from '@/assets/Handy-Dudes-Birmingham-Alabama-Handyman.png'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -82,10 +84,10 @@ function DashboardPage() {
           ) : (
             <div className="divide-y divide-slate-200">
               {notifications.map((item) => (
-                <div key={item.id} className={cn('px-4 py-3 transition-colors hover:bg-slate-50', !item.readAt && 'bg-sky-50/40')}>
+                <div key={item.id} className={cn('px-4 py-3 transition-colors hover:bg-slate-50', !item.readAt && 'bg-[#262742]/10')}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-1.5">
-                      {!item.readAt && <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />}
+                      {!item.readAt && <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#262742]" />}
                       <p className="text-sm font-semibold text-slate-900">{item.title}</p>
                     </div>
                     <button
@@ -239,48 +241,73 @@ function DashboardPage() {
         )}
         <aside
           className={cn(
-            'absolute inset-y-0 left-0 z-30 flex w-[250px] flex-col border-r border-slate-700 bg-slate-800 px-5 pb-5 pt-6 transition-transform sm:pt-8 lg:relative lg:z-10 lg:translate-x-0',
+            'absolute inset-y-0 left-0 z-30 flex w-[240px] flex-col border-r border-[#1a1b30] bg-[#262742] transition-transform lg:relative lg:z-10 lg:translate-x-0',
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           )}>
-          <p className="mb-6 mt-10 text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Handy Dudes</p>
-          <button
-            type="button"
-            onClick={() => {
-              navigate('/dashboard/settings')
-              if (!isDesktop) setIsSidebarOpen(false)
-            }}
-            className="mb-6 w-full rounded-2xl border border-slate-600 bg-slate-700 p-4 text-center transition-colors hover:bg-slate-600">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-sky-500/20 text-sm font-bold text-sky-300">
-              {userInitials || 'HD'}
-            </div>
-            <p className="font-semibold text-white">{userName}</p>
-            <p className="text-xs text-slate-400">{user?.email ?? 'sales@handydudes.com'}</p>
-          </button>
 
-          <nav aria-label="Dashboard navigation" className="space-y-1">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors',
-                    isActive
-                      ? 'bg-sky-500/20 text-sky-300'
-                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                  )
-                }>
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </NavLink>
-            ))}
+          {/* Logo */}
+          <div className="mt-10 px-4">
+            <img src={handyDudesLogo} alt="Handy Dudes" className="h-14 w-auto" />
+          </div>
+
+          <div className="mx-5 mb-2 mt-6 h-px bg-white/20" />
+
+          {/* Nav */}
+          <nav aria-label="Dashboard navigation" className="flex-1 overflow-y-auto px-3 py-3">
+            <div className="space-y-0.5">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => { if (!isDesktop) setIsSidebarOpen(false) }}
+                  className={({ isActive }) =>
+                    cn(
+                      'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    )
+                  }>
+                  {({ isActive }) => (
+                    <>
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-white" />
+                      )}
+                      <item.icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-white/60')} />
+                      {item.label}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
           </nav>
-          <Button onClick={handleLogout} variant="outline" className="mt-8 w-full border-slate-600 bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white">
-            Logout
-          </Button>
-          <div className="mt-auto pt-6 text-center text-xs text-slate-500">
-            <p>Handy Dudes Quoter v{__APP_VERSION__}</p>
-            <p>by <a href="https://www.arkinnovations.rw" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">Ark Innovations</a></p>
+
+          {/* Bottom */}
+          <div className="px-3 pb-5">
+            <div className="mb-3 h-px bg-white/20" />
+            <button
+              type="button"
+              onClick={() => {
+                navigate('/dashboard/settings')
+                if (!isDesktop) setIsSidebarOpen(false)
+              }}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-white/10">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-xs font-bold text-white">
+                {userInitials || 'HD'}
+              </div>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-sm font-semibold text-white">{userName}</p>
+                <p className="truncate text-xs text-white/60">{user?.email ?? 'sales@handydudes.com'}</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white">
+              <LogOut className="h-4 w-4 shrink-0" />
+              Sign out
+            </button>
+            <p className="mt-3 px-3 text-[11px] text-white/40">v{__APP_VERSION__}</p>
           </div>
         </aside>
 

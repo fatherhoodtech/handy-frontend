@@ -6,7 +6,7 @@ export function cn(...inputs) {
 }
 
 const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700',
+  'bg-[#262742]/15 text-[#262742]',
   'bg-emerald-100 text-emerald-700',
   'bg-violet-100 text-violet-700',
   'bg-amber-100 text-amber-700',

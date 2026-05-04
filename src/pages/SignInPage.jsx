@@ -63,7 +63,7 @@ function SignInPage() {
       <section className="relative flex min-h-screen items-center overflow-hidden bg-black px-8 py-12 text-white sm:px-12 lg:px-16">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(125,211,252,0.28),transparent_35%),radial-gradient(circle_at_80%_60%,rgba(56,189,248,0.2),transparent_35%)]" />
         <div className="relative z-10 max-w-xl space-y-8">
-          <p className="text-xs uppercase tracking-[0.35em] text-sky-300">Handy Dudes</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-[#262742]">Handy Dudes</p>
           <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
             Welcome to Handy Dudes Sales & Dispatch Platform.
           </h1>
@@ -76,8 +76,8 @@ function SignInPage() {
       </section>
 
       <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white px-6 py-10 sm:px-10">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.16),transparent_45%)]" />
-        <div className="relative w-full max-w-md rounded-2xl bg-[linear-gradient(120deg,#7dd3fc,#38bdf8,#a78bfa,#7dd3fc)] bg-[length:240%_240%] p-[2px] animate-[borderShift_8s_ease_infinite]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(38,39,66,0.12),transparent_45%)]" />
+        <div className="relative w-full max-w-md rounded-2xl bg-[linear-gradient(120deg,#262742,#3d3f6e,#a78bfa,#262742)] bg-[length:240%_240%] p-[2px] animate-[borderShift_8s_ease_infinite]">
           <Card className="rounded-[14px] border border-transparent bg-white shadow-[0_30px_90px_-35px_rgba(0,0,0,0.65)]">
             <CardHeader className="space-y-4">
               <div className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-zinc-900 bg-zinc-950 text-sm font-bold text-white">

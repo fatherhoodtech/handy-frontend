@@ -9,7 +9,7 @@ import { avatarColor, getInitials } from '@/lib/utils'
 import { Sparkles, X } from 'lucide-react'
 
 const STATUS_CONFIG = {
-  new:        { label: 'New',        dot: 'bg-blue-500',   text: 'text-blue-700',   bg: 'bg-blue-50'   },
+  new:        { label: 'New',        dot: 'bg-[#262742]',   text: 'text-[#262742]',   bg: 'bg-[#262742]/10'   },
   contacted:  { label: 'Contacted',  dot: 'bg-yellow-400', text: 'text-yellow-700', bg: 'bg-yellow-50' },
   qualified:  { label: 'Qualified',  dot: 'bg-green-500',  text: 'text-green-700',  bg: 'bg-green-50'  },
   quoted:     { label: 'Quoted',     dot: 'bg-purple-500', text: 'text-purple-700', bg: 'bg-purple-50' },
@@ -432,7 +432,7 @@ function RequestsPage() {
                   className="h-9 min-w-[220px] flex-1 rounded-lg border-zinc-200"
                 />
                 <select
-                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-[#262742]"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}>
                   <option value="all">All statuses</option>
@@ -444,7 +444,7 @@ function RequestsPage() {
                   <option value="lost">Lost</option>
                 </select>
                 <select
-                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-[#262742]"
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}>
                   <option value="all">All time</option>
@@ -460,7 +460,7 @@ function RequestsPage() {
                   </button>
                 ) : null}
               </div>
-              <Button type="button" className="h-9 bg-sky-500 text-white hover:bg-sky-600" onClick={openManualCreateForm}>
+              <Button type="button" className="h-9 bg-[#262742] text-white hover:bg-[#1a1b30]" onClick={openManualCreateForm}>
                 Create request
               </Button>
             </div>
@@ -508,7 +508,7 @@ function RequestsPage() {
               {filtered.map((item, index) => {
                 const usePrimaryTone = index % 2 === 0
                 const buttonToneClass = usePrimaryTone
-                  ? 'border-sky-200 bg-sky-50 text-sky-600 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-700'
+                  ? 'border-[#262742]/30 bg-[#262742]/10 text-[#1a1b30] hover:border-[#262742] hover:bg-[#262742]/15 hover:text-[#1a1b30]'
                   : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-700'
                 return (
                   <button
@@ -596,7 +596,7 @@ function RequestsPage() {
                         {(() => {
                           const usePrimaryTone = index % 2 === 0
                           const buttonToneClass = usePrimaryTone
-                            ? 'border-sky-200 bg-sky-50 text-sky-600 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-700'
+                            ? 'border-[#262742]/30 bg-[#262742]/10 text-[#1a1b30] hover:border-[#262742] hover:bg-[#262742]/15 hover:text-[#1a1b30]'
                             : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-700'
                           return (
                       <Button
@@ -783,7 +783,7 @@ function RequestsPage() {
                           href={selected.thumbtackDetails.thumbtackConversationUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-sky-600 underline underline-offset-2 hover:text-sky-700 break-all">
+                          className="text-[#1a1b30] underline underline-offset-2 hover:text-[#1a1b30] break-all">
                           {selected.thumbtackDetails.thumbtackConversationUrl}
                         </a>
                       </div>
@@ -799,7 +799,7 @@ function RequestsPage() {
                               href={url}
                               target="_blank"
                               rel="noreferrer"
-                              className="block text-sky-600 underline underline-offset-2 hover:text-sky-700 break-all">
+                              className="block text-[#1a1b30] underline underline-offset-2 hover:text-[#1a1b30] break-all">
                               {url}
                             </a>
                           ))}
@@ -865,7 +865,7 @@ function RequestsPage() {
                             href={att.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-sky-600 underline underline-offset-2 hover:text-sky-700">
+                            className="text-[#1a1b30] underline underline-offset-2 hover:text-[#1a1b30]">
                             {att?.fileName || att?.name || 'Attachment'}
                           </a>
                         ) : (
@@ -882,7 +882,7 @@ function RequestsPage() {
                   href={selected.jobberWebUri}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-sky-600 underline underline-offset-2 hover:text-sky-700">
+                  className="inline-flex items-center gap-1 text-[#1a1b30] underline underline-offset-2 hover:text-[#1a1b30]">
                   Open in Jobber ↗
                 </a>
               ) : null}
@@ -892,7 +892,7 @@ function RequestsPage() {
             <div className="shrink-0 border-t border-zinc-100 px-5 py-4">
               <Button
                 type="button"
-                className="ml-auto block bg-sky-500 text-white hover:bg-sky-600"
+                className="ml-auto block bg-[#262742] text-white hover:bg-[#1a1b30]"
                 onClick={() => handleContinueWithAI(selected)}>
                 Continue with AI
               </Button>
@@ -984,7 +984,7 @@ function RequestsPage() {
             </div>
             <div className="sticky bottom-0 mt-4 flex justify-end gap-2 border-t border-zinc-100 bg-white pt-3">
               <Button type="button" variant="outline" onClick={() => setShowManualForm(false)}>Cancel</Button>
-              <Button type="button" className="bg-sky-500 text-white hover:bg-sky-600" disabled={isSavingManual} onClick={handleSaveManualRequest}>
+              <Button type="button" className="bg-[#262742] text-white hover:bg-[#1a1b30]" disabled={isSavingManual} onClick={handleSaveManualRequest}>
                 {isSavingManual ? 'Saving...' : manualForm.id ? 'Update request' : 'Create request'}
               </Button>
             </div>

@@ -286,8 +286,8 @@ function QuotesPage() {
           value={isLoading ? '—' : syncedCount}
           sub="Sent to Jobber"
           icon={RefreshCw}
-          iconClass="bg-sky-50 text-sky-600"
-          borderClass="border-sky-200"
+          iconClass="bg-[#262742]/10 text-[#1a1b30]"
+          borderClass="border-[#262742]/30"
           onClick={() => setStatusFilter('synced')}
         />
       </div>
@@ -321,7 +321,7 @@ function QuotesPage() {
                   />
                 </div>
                 <select
-                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-[#262742]"
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value)}>
                   <option value="all">All statuses</option>
@@ -330,7 +330,7 @@ function QuotesPage() {
                   <option value="synced">Synced to Jobber</option>
                 </select>
                 <select
-                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-sky-400"
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 outline-none focus:border-[#262742]"
                   value={dateFilter}
                   onChange={(event) => setDateFilter(event.target.value)}>
                   <option value="all">All time</option>
@@ -481,8 +481,8 @@ function QuotesPage() {
                           <span className="h-1.5 w-1.5 rounded-full bg-red-400" />Failed
                         </span>
                       ) : jobberReadinessByQuoteId[quote.id]?.ready ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />Ready
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#262742]/30 bg-[#262742]/10 px-2.5 py-0.5 text-xs font-semibold text-[#1a1b30]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#262742]" />Ready
                         </span>
                       ) : quote.status === 'approved' ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
@@ -527,7 +527,7 @@ function QuotesPage() {
           ) : selectedQuote ? (
             <div className="space-y-3">
               {syncNotice ? (
-                <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700">
+                <p className="rounded-md border border-[#262742]/30 bg-[#262742]/10 px-3 py-2 text-xs text-[#1a1b30]">
                   {syncNotice}
                 </p>
               ) : null}
@@ -567,7 +567,7 @@ function QuotesPage() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="mt-2 h-8 text-xs text-sky-600 hover:text-sky-700"
+                          className="mt-2 h-8 text-xs text-[#1a1b30] hover:text-[#1a1b30]"
                           onClick={() => handleEditContactForQuote(selectedQuote)}>
                           Edit Contact
                         </Button>
