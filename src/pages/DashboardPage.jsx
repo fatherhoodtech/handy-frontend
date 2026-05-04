@@ -23,12 +23,12 @@ function DashboardPage() {
   // NotificationPanel is defined as an inner component so it can close over state
   function NotificationPanel() {
     return (
-      <div className="absolute right-0 top-full z-50 mt-2 flex w-80 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl">
+      <div className="absolute right-0 top-full z-50 mt-2 flex w-80 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <div className="flex items-center gap-2">
-            <Bell className="h-4 w-4 text-zinc-500" />
-            <h2 className="text-sm font-semibold text-zinc-900">Notifications</h2>
+            <Bell className="h-4 w-4 text-slate-500" />
+            <h2 className="text-sm font-semibold text-slate-900">Notifications</h2>
             {unreadCount > 0 && (
               <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                 {unreadCount}
@@ -38,19 +38,19 @@ function DashboardPage() {
           <button
             type="button"
             onClick={() => setIsNotificationsOpen(false)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700">
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Action bar */}
         {notifications.length > 0 && (
-          <div className="flex items-center gap-1 border-b border-zinc-100 px-3 py-2">
+          <div className="flex items-center gap-1 border-b border-slate-200 px-3 py-2">
             <button
               type="button"
               onClick={markAllRead}
               title="Mark all as read"
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900">
               <CheckCheck className="h-3.5 w-3.5" />
               Mark all read
             </button>
@@ -76,28 +76,28 @@ function DashboardPage() {
         <div className="max-h-[420px] overflow-y-auto">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10">
-              <Bell className="mb-2 h-7 w-7 text-zinc-200" />
-              <p className="text-sm text-zinc-500">No notifications yet</p>
+              <Bell className="mb-2 h-7 w-7 text-slate-200" />
+              <p className="text-sm text-slate-500">No notifications yet</p>
             </div>
           ) : (
-            <div className="divide-y divide-zinc-100">
+            <div className="divide-y divide-slate-200">
               {notifications.map((item) => (
-                <div key={item.id} className={cn('px-4 py-3 transition-colors hover:bg-zinc-50', !item.readAt && 'bg-sky-50/40')}>
+                <div key={item.id} className={cn('px-4 py-3 transition-colors hover:bg-slate-50', !item.readAt && 'bg-sky-50/40')}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       {!item.readAt && <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />}
-                      <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
+                      <p className="text-sm font-semibold text-slate-900">{item.title}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => clearNotification(item.id)}
                       title="Dismiss"
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-600">
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
-                  <p className="mt-0.5 text-xs text-zinc-600">{item.body}</p>
-                  <p className="mt-1 text-[11px] text-zinc-400">{new Date(item.createdAt).toLocaleString()}</p>
+                  <p className="mt-0.5 text-xs text-slate-600">{item.body}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">{new Date(item.createdAt).toLocaleString()}</p>
                 </div>
               ))}
             </div>
@@ -239,35 +239,35 @@ function DashboardPage() {
         )}
         <aside
           className={cn(
-            'absolute inset-y-0 left-0 z-30 flex w-[250px] flex-col border-r border-zinc-200 bg-zinc-50/70 p-5 transition-transform lg:relative lg:z-10 lg:translate-x-0',
+            'absolute inset-y-0 left-0 z-30 flex w-[250px] flex-col border-r border-slate-700 bg-slate-800 px-5 pb-5 pt-6 transition-transform sm:pt-8 lg:relative lg:z-10 lg:translate-x-0',
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           )}>
-          <p className="mb-6 text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Handy Dudes</p>
+          <p className="mb-6 mt-10 text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Handy Dudes</p>
           <button
             type="button"
             onClick={() => {
               navigate('/dashboard/settings')
               if (!isDesktop) setIsSidebarOpen(false)
             }}
-            className="mb-6 w-full rounded-2xl border border-sky-200 bg-white p-4 text-center transition-colors hover:bg-sky-50">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">
+            className="mb-6 w-full rounded-2xl border border-slate-600 bg-slate-700 p-4 text-center transition-colors hover:bg-slate-600">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-sky-500/20 text-sm font-bold text-sky-300">
               {userInitials || 'HD'}
             </div>
-            <p className="font-semibold text-zinc-900">{userName}</p>
-            <p className="text-xs text-zinc-500">{user?.email ?? 'sales@handydudes.com'}</p>
+            <p className="font-semibold text-white">{userName}</p>
+            <p className="text-xs text-slate-400">{user?.email ?? 'sales@handydudes.com'}</p>
           </button>
 
-          <nav aria-label="Dashboard navigation" className="space-y-2">
+          <nav aria-label="Dashboard navigation" className="space-y-1">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors',
+                    'flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors',
                     isActive
-                      ? 'border-sky-300 bg-sky-50 text-sky-700'
-                      : 'border-zinc-200 bg-white text-zinc-700 hover:border-sky-300 hover:bg-sky-50'
+                      ? 'bg-sky-500/20 text-sky-300'
+                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
                   )
                 }>
                 <item.icon className="h-4 w-4" />
@@ -275,12 +275,13 @@ function DashboardPage() {
               </NavLink>
             ))}
           </nav>
-          <Button onClick={handleLogout} variant="outline" className="mt-8 w-full">
+          <Button onClick={handleLogout} variant="outline" className="mt-8 w-full border-slate-600 bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white">
             Logout
           </Button>
-          <p className="mt-auto pt-6 text-center text-xs text-zinc-400">
-            Handy Dudes Quoter by Ark Innovations v{__APP_VERSION__}
-          </p>
+          <div className="mt-auto pt-6 text-center text-xs text-slate-500">
+            <p>Handy Dudes Quoter v{__APP_VERSION__}</p>
+            <p>by <a href="https://www.arkinnovations.rw" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">Ark Innovations</a></p>
+          </div>
         </aside>
 
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden p-6 sm:p-8">
@@ -306,7 +307,7 @@ function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsNotificationsOpen((v) => !v)}
-                  className="relative flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-500 transition-colors hover:bg-sky-100 hover:text-sky-600">
+                  className="relative flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700">
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (
                     <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">

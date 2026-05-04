@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
 import { dollarsToCents } from '@/lib/pricingMoney'
 import { Bot, Copy, FileText, History, X } from 'lucide-react'
-import { useBlocker, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 function toInt(value) {
   const parsed = Number.parseInt(String(value ?? '0'), 10)
@@ -534,7 +534,6 @@ function AiAssistantPage() {
   const [pendingSeedHandoff, setPendingSeedHandoff] = useState(null)
   const [pendingContactHandoff, setPendingContactHandoff] = useState(null)
   const [isHandoffSaving, setIsHandoffSaving] = useState(false)
-  const blocker = useBlocker(hasUnsavedChanges)
   const chatViewportRef = useRef(null)
   const chatBottomRef = useRef(null)
   const clientPickerRef = useRef(null)
@@ -1208,16 +1207,6 @@ function AiAssistantPage() {
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [hasUnsavedChanges])
-
-  // Handle React Router in-app navigation block
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return
-    if (window.confirm('You have unsaved changes. Leave anyway?')) {
-      blocker.proceed()
-    } else {
-      blocker.reset()
-    }
-  }, [blocker.state])
 
   function handleChatScroll() {
     const el = chatViewportRef.current
