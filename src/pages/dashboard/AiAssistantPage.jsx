@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useToast } from '@/components/ui/toast'
+import { formatFieldName, useToast } from '@/components/ui/toast'
 import { apiRequest } from '@/lib/apiClient'
 import { dollarsToCents } from '@/lib/pricingMoney'
 import { Bot, Copy, FileText, History, X } from 'lucide-react'
@@ -531,6 +531,7 @@ function AiAssistantPage() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [chatError, setChatError] = useState('')
   const [actionNotice, setActionNotice] = useState('')
+  const [addressPrompt, setAddressPrompt] = useState(null)
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
   const [pendingSeedHandoff, setPendingSeedHandoff] = useState(null)
@@ -1507,15 +1508,23 @@ function AiAssistantPage() {
         ? response.jobberSync.missingFields
         : []
       if (syncStatus === 'failed') {
-        const failReason =
-          reasonCategory === 'preflight_validation_failed' && missingFields.length > 0
-            ? `Missing required fields: ${missingFields.join(', ')}.`
-            : reasonCategory === 'property_resolution_failed'
-              ? 'Client found in Jobber but has no usable service address. Add a property to that client in Jobber, then retry.'
-              : syncError
-                ? syncError
-                : 'Unknown error from Jobber.'
-        showToast(`Jobber sync failed — ${failReason} The quote was saved locally. Retry from the Quotes page.`, 'error')
+        if (reasonCategory === 'preflight_validation_failed' && missingFields.length > 0) {
+          showToast({
+            title: 'Failed to create quote in Jobber',
+            body: 'The client is missing required information:',
+            items: missingFields.map(formatFieldName),
+            hint: 'Go to Contacts, open this client, and fill in the missing details. Once updated, retry sending the quote from the Quotes page.',
+          }, 'error')
+        } else if (reasonCategory === 'property_resolution_failed') {
+          setAddressPrompt({ quoteId, address: quoteDraft.client.address ?? '', isSaving: false })
+          showToast('Jobber sync failed — this client has no service address. Update the contact with their address, then retry from the Quotes page.', 'error')
+        } else {
+          showToast({
+            title: 'Failed to create quote in Jobber',
+            body: syncError || 'An unexpected error occurred while syncing to Jobber.',
+            hint: 'The quote was saved locally and is visible on the Quotes page. You can retry sending it to Jobber from there.',
+          }, 'error')
+        }
         return
       }
 
@@ -1548,10 +1557,57 @@ function AiAssistantPage() {
     }
   }
 
+  async function handleAddressAndRetry() {
+    if (!addressPrompt || !selectedClientId) return
+    setAddressPrompt((prev) => ({ ...prev, isSaving: true }))
+    try {
+      await apiRequest(`/api/sales/contacts/${selectedClientId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ addressLine1: addressPrompt.address.trim() }),
+      })
+      const retryRes = await apiRequest(
+        `/api/sales/quotes/${encodeURIComponent(addressPrompt.quoteId)}/retry-jobber-sync`,
+        { method: 'POST' }
+      )
+      const retryStatus = String(retryRes?.jobberSync?.status ?? '')
+      if (retryStatus === 'synced') {
+        setAddressPrompt(null)
+        showToast('Quote synced to Jobber successfully.', 'success')
+        const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
+        setMessages(normalizeMessages(resetResponse?.messages))
+        if (resetResponse?.quoteDraft) setQuoteDraft(recalcDraft(resetResponse.quoteDraft))
+        setSelectedClientId('')
+        setClientSearch('')
+        setDraftUpdated(false)
+        setHasUnsavedChanges(false)
+        setAutoSaveStatus('idle')
+        setCatalogSearch('')
+        setCatalogSelectionId('')
+        setLaborTradeSearch('')
+        setLaborTradeSuggestions([])
+        setActiveLaborTradeRow(-1)
+        setActionNotice('Started a new blank draft.')
+        setTimeout(() => setActionNotice(''), 4000)
+      } else {
+        const retryError = String(retryRes?.jobberSync?.error ?? '')
+        showToast({
+          title: 'Jobber sync still failed',
+          body: retryError || 'The address was saved but Jobber rejected the sync.',
+          hint: 'You can retry from the Quotes page once the issue is resolved.',
+        }, 'error')
+        setAddressPrompt((prev) => ({ ...prev, isSaving: false }))
+      }
+    } catch (err) {
+      showToast(err?.message || 'Failed to save address or retry sync.', 'error')
+      setAddressPrompt((prev) => ({ ...prev, isSaving: false }))
+    }
+  }
+
   async function handleNewChat() {
     if (isCreatingNewChat) return
     setChatError('')
     setActionNotice('')
+    setAddressPrompt(null)
     setIsCreatingNewChat(true)
     try {
       const response = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
