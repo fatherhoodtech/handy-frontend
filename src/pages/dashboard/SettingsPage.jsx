@@ -308,7 +308,7 @@ function SettingsPage() {
                       <p className="text-sm text-zinc-900">{profile.id || '—'}</p>
                     </div>
                   </div>
-                  <Button type="button" onClick={saveProfile} disabled={isSavingProfile}>
+                  <Button type="button" onClick={saveProfile} disabled={isSavingProfile} className="h-10 px-5">
                     {isSavingProfile ? 'Saving...' : 'Save Profile'}
                   </Button>
                 </div>
@@ -335,7 +335,7 @@ function SettingsPage() {
                     value={passwordForm.confirmPassword}
                     onChange={(e) => setPasswordForm((c) => ({ ...c, confirmPassword: e.target.value }))}
                   />
-                  <Button type="button" onClick={savePassword} disabled={isSavingPassword}>
+                  <Button type="button" onClick={savePassword} disabled={isSavingPassword} className="h-10 px-5">
                     {isSavingPassword ? 'Saving...' : 'Change Password'}
                   </Button>
                 </div>
@@ -373,7 +373,7 @@ function SettingsPage() {
                   <option value="sales">Salesperson</option>
                   <option value="admin">Admin</option>
                 </select>
-                <Button type="button" onClick={createUser} disabled={isSavingUser}>
+                <Button type="button" onClick={createUser} disabled={isSavingUser} className="h-10 px-5">
                   {isSavingUser ? 'Creating...' : 'Create User'}
                 </Button>
               </div>
@@ -487,7 +487,7 @@ function SettingsPage() {
                   }
                 />
               </div>
-              <Button type="button" onClick={saveQuoteDefaults} disabled={isSaving}>
+              <Button type="button" onClick={saveQuoteDefaults} disabled={isSaving} className="h-10 px-5">
                 {isSaving ? 'Saving...' : 'Save Defaults'}
               </Button>
             </div>

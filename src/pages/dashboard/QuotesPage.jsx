@@ -3,6 +3,7 @@ import { apiRequest } from '@/lib/apiClient'
 import { formatCentsToDollars } from '@/lib/pricingMoney'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/toast'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, FileText, CheckCircle, RefreshCw, Search, X } from 'lucide-react'
 import { cn, formatRelativeTime } from '@/lib/utils'
@@ -50,9 +51,9 @@ function StatCard({ label, value, sub, icon: Icon, iconClass, borderClass, onCli
 
 function QuotesPage() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [quotes, setQuotes] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
@@ -91,7 +92,7 @@ function QuotesPage() {
         }
       } catch (err) {
         if (cancelled) return
-        setError(err?.message || 'Failed to load quotes')
+        showToast(err?.message || 'Failed to load quotes', 'error')
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -119,13 +120,12 @@ function QuotesPage() {
 
   async function openQuoteDetail(quoteId) {
     try {
-      setError('')
       setSyncNotice('')
       setIsLoadingQuoteDetail(true)
       const response = await apiRequest(`/api/sales/quotes/${encodeURIComponent(quoteId)}`)
       setSelectedQuote(response?.quote ?? null)
     } catch (err) {
-      setError(err?.message || 'Failed to load quote details')
+      showToast(err?.message || 'Failed to load quote details', 'error')
     } finally {
       setIsLoadingQuoteDetail(false)
     }
@@ -134,7 +134,6 @@ function QuotesPage() {
   async function handleContinueDraft(quote) {
     const quoteId = String(quote?.id ?? '').trim()
     if (!quoteId || isContinuingDraftId) return
-    setError('')
     setIsContinuingDraftId(quoteId)
     try {
       await apiRequest(`/api/sales/quotes/${encodeURIComponent(quoteId)}/continue`, { method: 'POST' })
@@ -144,7 +143,7 @@ function QuotesPage() {
         },
       })
     } catch (err) {
-      setError(err?.message || 'Failed to open quote in AI assistant. Please try again.')
+      showToast(err?.message || 'Failed to open quote in AI assistant. Please try again.', 'error')
     } finally {
       setIsContinuingDraftId(null)
     }
@@ -177,14 +176,13 @@ function QuotesPage() {
 
   async function handleDeleteQuote(quoteId) {
     try {
-      setError('')
       setIsDeletingQuoteId(quoteId)
       await apiRequest(`/api/sales/quotes/${encodeURIComponent(quoteId)}`, { method: 'DELETE' })
       setQuotes((current) => current.filter((quote) => quote.id !== quoteId))
       setSelectedQuote((current) => (current?.id === quoteId ? null : current))
       setDeleteQuoteTarget(null)
     } catch (err) {
-      setError(err?.message || 'Failed to delete quote')
+      showToast(err?.message || 'Failed to delete quote', 'error')
     } finally {
       setIsDeletingQuoteId('')
     }
@@ -192,7 +190,6 @@ function QuotesPage() {
 
   async function handleRetryJobberSync(quoteId) {
     try {
-      setError('')
       setSyncNotice('')
       setIsRetryingJobberQuoteId(quoteId)
       const retryResponse = await apiRequest(`/api/sales/quotes/${encodeURIComponent(quoteId)}/retry-jobber-sync`, {
@@ -235,7 +232,7 @@ function QuotesPage() {
         setSyncNotice('Jobber sync request finished. Refreshing status...')
       }
     } catch (err) {
-      setError(err?.message || 'Failed to retry Jobber sync')
+      showToast(err?.message || 'Failed to retry Jobber sync', 'error')
     } finally {
       setIsRetryingJobberQuoteId('')
     }
@@ -372,13 +369,6 @@ function QuotesPage() {
             </table>
           </div>
         </div>
-
-        {/* Error banner */}
-        {error && (
-          <div className="border-b border-red-100 bg-red-50 px-5 py-3">
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        )}
 
         {/* Loading */}
         {isLoading && (
@@ -625,7 +615,7 @@ function QuotesPage() {
                     : 'Delete Quote'}
                 </Button>
                 <div className="ml-auto flex items-center gap-2">
-                  {(() => {
+                  {selectedQuote.status === 'approved' && (() => {
                     const readiness = jobberReadinessByQuoteId[selectedQuote.id]
                     const missingFields = normalizeMissingFields(readiness)
                     const isSynced = selectedQuote.jobberSyncStatus === 'synced'

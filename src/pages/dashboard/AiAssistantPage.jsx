@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useToast } from '@/components/ui/toast'
 import { apiRequest } from '@/lib/apiClient'
 import { dollarsToCents } from '@/lib/pricingMoney'
 import { Bot, Copy, FileText, History, X } from 'lucide-react'
@@ -496,6 +497,7 @@ function applyHandoffClientToDraft(draft, handoffClient) {
 function AiAssistantPage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [prompt, setPrompt] = useState('')
   const [quoteDraft, setQuoteDraft] = useState(createDefaultQuoteDraft)
   const [messages, setMessages] = useState([])
@@ -620,6 +622,7 @@ function AiAssistantPage() {
             ? 'Resumed existing draft for this request.'
             : 'Started a new draft for this request.'
         )
+        setTimeout(() => setActionNotice(''), 4000)
         requestAnimationFrame(() => scrollToLatest('auto'))
       } catch (error) {
         if (cancelled) return
@@ -1503,6 +1506,19 @@ function AiAssistantPage() {
       const missingFields = Array.isArray(response?.jobberSync?.missingFields)
         ? response.jobberSync.missingFields
         : []
+      if (syncStatus === 'failed') {
+        const failReason =
+          reasonCategory === 'preflight_validation_failed' && missingFields.length > 0
+            ? `Missing required fields: ${missingFields.join(', ')}.`
+            : reasonCategory === 'property_resolution_failed'
+              ? 'Client found in Jobber but has no usable service address. Add a property to that client in Jobber, then retry.'
+              : syncError
+                ? syncError
+                : 'Unknown error from Jobber.'
+        showToast(`Jobber sync failed — ${failReason} The quote was saved locally. Retry from the Quotes page.`, 'error')
+        return
+      }
+
       const resetResponse = await apiRequest('/api/sales/ai-assistant/new-chat', { method: 'POST' })
       setMessages(normalizeMessages(resetResponse?.messages))
       if (resetResponse?.quoteDraft) setQuoteDraft(recalcDraft(resetResponse.quoteDraft))
@@ -1516,17 +1532,14 @@ function AiAssistantPage() {
       setLaborTradeSearch('')
       setLaborTradeSuggestions([])
       setActiveLaborTradeRow(-1)
-      setActionNotice(
+      showToast(
         syncStatus === 'synced'
-          ? `Quote approved (${quoteId.slice(0, 8)}) and synced to Jobber${jobberQuoteId ? ` (${jobberQuoteId.slice(0, 10)})` : ''}. Started a new blank draft.`
-          : syncStatus === 'failed'
-            ? reasonCategory === 'preflight_validation_failed' && missingFields.length > 0
-              ? `Quote approved locally (${quoteId.slice(0, 8)}), but Jobber sync failed due to missing fields: ${missingFields.join(', ')}. Started a new blank draft.`
-              : `Quote approved locally (${quoteId.slice(0, 8)}), but Jobber sync failed${syncError ? `: ${syncError}` : '.'} Started a new blank draft.`
-            : quoteId
-              ? `Quote approved and saved (${quoteId.slice(0, 8)}). Started a new blank draft.`
-              : 'Quote approved and saved. Started a new blank draft.'
+          ? `Quote approved and synced to Jobber${jobberQuoteId ? ` (${jobberQuoteId.slice(0, 10)})` : ''}.`
+          : quoteId ? `Quote approved and saved (${quoteId.slice(0, 8)}).` : 'Quote approved and saved.',
+        'success'
       )
+      setActionNotice('Started a new blank draft.')
+      setTimeout(() => setActionNotice(''), 4000)
       requestAnimationFrame(() => scrollToLatest('auto'))
     } catch (error) {
       setChatError(error?.message || 'Failed to approve quote')
@@ -1583,17 +1596,6 @@ function AiAssistantPage() {
   return (
     <>
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-      {location.state?.jobberRequestSeed ? (
-        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-[#262742]/30 bg-[#262742]/10 px-4 py-2.5">
-          <FileText className="h-4 w-4 shrink-0 text-[#262742]" />
-          <p className="text-sm text-[#1a1b30]">
-            Building quote for:{' '}
-            <span className="font-semibold">
-              {String(location.state.jobberRequestSeed.title ?? '').trim() || 'this request'}
-            </span>
-          </p>
-        </div>
-      ) : null}
       <div className="flex min-h-0 flex-1 flex-row gap-4 overflow-hidden">
         <div className="flex h-full min-h-0 w-1/2 flex-col rounded-xl border border-zinc-200 bg-white">
           <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 px-5 py-4">
