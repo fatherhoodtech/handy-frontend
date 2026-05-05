@@ -86,7 +86,7 @@ function normalizeHtmlError(raw) {
 
 async function parseApiError(response, requestPath) {
   const raw = await response.text()
-  let message = 'Request failed'
+  let message = 'Something went wrong. Please try again.'
   let parsedBody = null
   try {
     const body = raw ? JSON.parse(raw) : {}
@@ -137,10 +137,12 @@ export async function apiRequest(path, options = {}, retried = false) {
     })
   } catch {
     const error = new Error(
-      `Network error while calling ${path}. ` +
-      `Ensure backend API is running/reachable and API base/proxy settings are correct.`
+      navigator.onLine
+        ? "Couldn't reach the server. Please check your connection and try again."
+        : "You're offline. Please check your internet connection and try again."
     )
     error.status = 0
+    error.isNetworkError = true
     throw error
   }
 
@@ -150,9 +152,7 @@ export async function apiRequest(path, options = {}, retried = false) {
       if (refreshed) {
         return apiRequest(path, options, true)
       }
-      const expired = new Error('Session expired. Please sign in again.')
-      expired.status = 401
-      throw expired
+      window.location.reload()
     }
     await parseApiError(response, path)
   }

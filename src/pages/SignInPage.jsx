@@ -40,7 +40,15 @@ function SignInPage() {
       await login(formData.email, formData.password)
       navigate('/dashboard')
     } catch (error) {
-      setErrorMessage(error?.message || 'Unable to sign in')
+      if (error.status === 401) {
+        setErrorMessage('Incorrect email or password. Please check your details and try again.')
+      } else if (error.status === 429) {
+        setErrorMessage('Too many login attempts. Please wait a few minutes and try again.')
+      } else if (error.status === 503 || error.isNetworkError) {
+        setErrorMessage(error.message)
+      } else {
+        setErrorMessage(error?.message || 'Unable to sign in. Please contact your administrator.')
+      }
     } finally {
       setIsSubmitting(false)
     }

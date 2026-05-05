@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatFieldName, useToast } from '@/components/ui/toast'
 import { apiRequest } from '@/lib/apiClient'
 import { dollarsToCents } from '@/lib/pricingMoney'
@@ -494,6 +495,68 @@ function applyHandoffClientToDraft(draft, handoffClient) {
   }
 }
 
+function QuoteBuilderSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+          <Skeleton className="mb-2 h-3 w-24" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+          <Skeleton className="mb-2 h-3 w-20" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+      </div>
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+        <Skeleton className="mb-2 h-3 w-28" />
+        <Skeleton className="h-28 w-full" />
+      </div>
+      <div className="rounded-lg border border-zinc-200 bg-zinc-100/55 p-3">
+        <Skeleton className="mb-3 h-3 w-20" />
+        <div className="flex flex-col gap-2">
+          {[0, 1].map((i) => (
+            <div key={i} className="grid grid-cols-2 gap-2">
+              <Skeleton className="h-8" />
+              <Skeleton className="h-8" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50/90 p-3">
+        <div className="grid grid-cols-2 gap-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-6" />
+          ))}
+        </div>
+      </div>
+      <div className="rounded-lg border border-zinc-200 bg-zinc-100/45 p-3">
+        <Skeleton className="mb-3 h-3 w-24" />
+        <div className="grid grid-cols-2 gap-2">
+          <Skeleton className="h-9" />
+          <Skeleton className="h-9" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AiAssistantSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-start">
+        <Skeleton className="h-16 w-4/5 rounded-lg" />
+      </div>
+      <div className="flex justify-end">
+        <Skeleton className="h-10 w-3/5 rounded-lg" />
+      </div>
+      <div className="flex justify-start">
+        <Skeleton className="h-20 w-4/5 rounded-lg" />
+      </div>
+    </div>
+  )
+}
+
 function AiAssistantPage() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -517,6 +580,7 @@ function AiAssistantPage() {
   const [activeLaborTradeRow, setActiveLaborTradeRow] = useState(-1)
   const [selectedClientId, setSelectedClientId] = useState('')
   const [isSavingClient, setIsSavingClient] = useState(false)
+  const [currentQuoteId, setCurrentQuoteId] = useState(null)
   const [isLoadingThread, setIsLoadingThread] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [draftUpdated, setDraftUpdated] = useState(false)
@@ -584,6 +648,7 @@ function AiAssistantPage() {
           setQuoteDraft(recalcDraft(threadResponse.quoteDraft))
         }
         setSelectedClientId(threadResponse?.selectedClientId ?? '')
+        setCurrentQuoteId(threadResponse?.currentQuoteId ?? null)
         didLoadThreadRef.current = true
         requestAnimationFrame(() => scrollToLatest('auto'))
       } catch (error) {
@@ -615,6 +680,7 @@ function AiAssistantPage() {
         setMessages(normalizeMessages(threadResponse?.messages))
         if (threadResponse?.quoteDraft) setQuoteDraft(recalcDraft(threadResponse.quoteDraft))
         setSelectedClientId(threadResponse?.selectedClientId ?? '')
+        setCurrentQuoteId(threadResponse?.currentQuoteId ?? null)
         setDraftUpdated(false)
         didLoadThreadRef.current = true
         processedRequestContinueNavKeyRef.current = location.key
@@ -652,6 +718,7 @@ function AiAssistantPage() {
         setMessages(normalizeMessages(threadResponse?.messages))
         if (threadResponse?.quoteDraft) setQuoteDraft(recalcDraft(threadResponse.quoteDraft))
         setSelectedClientId(threadResponse?.selectedClientId ?? '')
+        setCurrentQuoteId(threadResponse?.currentQuoteId ?? null)
         setDraftUpdated(false)
         didLoadThreadRef.current = true
         processedQuoteResumeNavKeyRef.current = location.key
@@ -823,6 +890,7 @@ function AiAssistantPage() {
     const d = String(seed.quoteDescription ?? '').trim()
     setQuoteDraft(recalcDraft({ ...base, title: t || base.title, quoteDescription: d || base.quoteDescription }))
     setSelectedClientId('')
+    setCurrentQuoteId(null)
     setDraftUpdated(false)
     // Persist seed fields to DB so they survive the first message send
     if (t || d) {
@@ -874,6 +942,7 @@ function AiAssistantPage() {
     if (resetResponse?.quoteDraft) {
       setQuoteDraft(recalcDraft(applyHandoffClientToDraft(recalcDraft(resetResponse.quoteDraft), handoffClient)))
     }
+    setCurrentQuoteId(null)
 
     const clientResponse = await apiRequest('/api/sales/ai-assistant/thread/client', {
       method: 'PATCH',
@@ -1146,9 +1215,9 @@ function AiAssistantPage() {
     const timer = setTimeout(async () => {
       try {
         setIsLoadingHistory(true)
-        const response = await apiRequest(
-          `/api/sales/ai-assistant/history?q=${encodeURIComponent(historySearch.trim())}`
-        )
+        const qs = new URLSearchParams({ q: historySearch.trim() })
+        if (currentQuoteId) qs.set('quote_id', currentQuoteId)
+        const response = await apiRequest(`/api/sales/ai-assistant/history?${qs}`)
         if (isCancelled) return
         setHistoryRecords(Array.isArray(response?.history) ? response.history : [])
       } catch (error) {
@@ -1162,7 +1231,7 @@ function AiAssistantPage() {
       isCancelled = true
       clearTimeout(timer)
     }
-  }, [historyOpen, historySearch])
+  }, [historyOpen, historySearch, currentQuoteId])
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -1453,6 +1522,7 @@ function AiAssistantPage() {
       if (resetResponse?.quoteDraft) setQuoteDraft(recalcDraft(resetResponse.quoteDraft))
       setSelectedClientId('')
       setClientSearch('')
+      setCurrentQuoteId(null)
       setDraftUpdated(false)
       setCatalogSearch('')
       setCatalogSelectionId('')
@@ -1476,10 +1546,11 @@ function AiAssistantPage() {
     setAutoSaveStatus('saving')
     try {
       const jobberRequestId = String(location.state?.jobberRequestId ?? '').trim() || undefined
-      await apiRequest('/api/sales/ai-assistant/draft/save', {
+      const response = await apiRequest('/api/sales/ai-assistant/draft/save', {
         method: 'POST',
         body: JSON.stringify({ jobberRequestId, quoteDraft }),
       })
+      setCurrentQuoteId(response?.quote?.id ?? null)
       setHasUnsavedChanges(false)
       setAutoSaveStatus('saved')
       setTimeout(() => setAutoSaveStatus('idle'), 3000)
@@ -1587,6 +1658,7 @@ function AiAssistantPage() {
         if (resetResponse?.quoteDraft) setQuoteDraft(recalcDraft(resetResponse.quoteDraft))
         setSelectedClientId('')
         setClientSearch('')
+        setCurrentQuoteId(null)
         setDraftUpdated(false)
         setHasUnsavedChanges(false)
         setAutoSaveStatus('idle')
@@ -1624,6 +1696,7 @@ function AiAssistantPage() {
       if (response?.quoteDraft) setQuoteDraft(recalcDraft(response.quoteDraft))
       setSelectedClientId('')
       setClientSearch('')
+      setCurrentQuoteId(null)
       setDraftUpdated(false)
       setHistoryOpen(false)
     } catch (error) {
@@ -1672,6 +1745,7 @@ function AiAssistantPage() {
           </div>
           <div className="min-h-0 flex flex-1 flex-col overflow-hidden px-5 pb-5 pt-4">
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+              {isLoadingThread ? <QuoteBuilderSkeleton /> : <>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-600">Quote Title</p>
@@ -2013,6 +2087,7 @@ function AiAssistantPage() {
                   </div>
                 </div>
               </div>
+              </>}
             </div>
             <div className="mt-3 flex items-center justify-between gap-2 border-t border-zinc-200 bg-white pt-3">
               <div className="flex items-center gap-2">
@@ -2120,7 +2195,7 @@ function AiAssistantPage() {
                     </div>
                   </div>
                 ) : null}
-                {isLoadingThread ? <p className="text-xs text-zinc-500">Loading conversation...</p> : null}
+                {isLoadingThread ? <AiAssistantSkeleton /> : null}
                 <div ref={chatBottomRef} />
               </div>
             </div>
@@ -2250,7 +2325,12 @@ function AiAssistantPage() {
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <History className="h-4 w-4 text-[#262742]" />
-              <h2 className="text-sm font-semibold text-zinc-900">Past Chats</h2>
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-900">Past Chats</h2>
+                {currentQuoteId ? (
+                  <p className="text-xs text-zinc-500">Showing conversations about this quote</p>
+                ) : null}
+              </div>
             </div>
             <button
               type="button"
