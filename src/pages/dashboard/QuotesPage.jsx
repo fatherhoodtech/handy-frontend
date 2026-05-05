@@ -225,6 +225,8 @@ function QuotesPage() {
           setSyncNotice(
             `Jobber sync failed: Client exists in Jobber but no usable property was found. Open that client in Jobber, confirm at least one service property/address exists, then retry.`
           )
+        } else if (reasonCategory === 'auth_failed') {
+          setSyncNotice(`Jobber is disconnected — go to Settings → Integrations and click "Connect Jobber" to reconnect.`)
         } else {
           setSyncNotice(`Jobber sync failed${retryError ? `: ${retryError}` : '.'}`)
         }

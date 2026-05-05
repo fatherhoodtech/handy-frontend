@@ -1516,8 +1516,17 @@ function AiAssistantPage() {
             hint: 'Go to Contacts, open this client, and fill in the missing details. Once updated, retry sending the quote from the Quotes page.',
           }, 'error')
         } else if (reasonCategory === 'property_resolution_failed') {
-          setAddressPrompt({ quoteId, address: quoteDraft.client.address ?? '', isSaving: false })
-          showToast('Jobber sync failed — this client has no service address. Update the contact with their address, then retry from the Quotes page.', 'error')
+          showToast({
+            title: 'Jobber sync failed — could not create service address',
+            body: syncError || 'Jobber rejected the property creation.',
+            hint: 'If the contact is missing an address, update it in Contacts and retry from the Quotes page.',
+          }, 'error')
+        } else if (reasonCategory === 'auth_failed') {
+          showToast({
+            title: 'Jobber is disconnected',
+            body: 'Your Jobber connection has expired or been revoked.',
+            hint: 'Go to Settings → Integrations and click "Connect Jobber" to reconnect.',
+          }, 'error')
         } else {
           showToast({
             title: 'Failed to create quote in Jobber',

@@ -3,10 +3,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/apiClient'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/toast'
 import {
   Building2,
   FileText,
   Shield,
+  Plug,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react'
 
 function SectionHeader({ title, description }) {
@@ -19,6 +23,7 @@ function SectionHeader({ title, description }) {
 }
 
 function SettingsPage() {
+  const { showToast } = useToast()
   const [activeTab, setActiveTab] = useState('account')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -41,6 +46,8 @@ function SettingsPage() {
   const [deletingUserId, setDeletingUserId] = useState(null)
   const [pendingDeleteUser, setPendingDeleteUser] = useState(null)
   const [usersLoadError, setUsersLoadError] = useState('')
+  const [jobberStatus, setJobberStatus] = useState(null)
+  const [isConnecting, setIsConnecting] = useState(false)
 
   const tabs = useMemo(() => {
     const base = [
@@ -49,6 +56,7 @@ function SettingsPage() {
     ]
     if (profile.role === 'admin') {
       base.push({ id: 'users', label: 'Users', icon: Shield })
+      base.push({ id: 'integrations', label: 'Integrations', icon: Plug })
     }
     return base
   }, [profile.role])
@@ -97,6 +105,40 @@ function SettingsPage() {
       cancelled = true
     }
   }, [])
+
+  // Handle Jobber OAuth callback redirect params and load Jobber status for admins
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const jobberParam = params.get('jobber')
+    const tabParam = params.get('tab')
+    if (jobberParam || tabParam) {
+      if (tabParam) setActiveTab(tabParam)
+      if (jobberParam === 'connected') {
+        showToast('Jobber connected successfully!', 'success')
+      } else if (jobberParam === 'error') {
+        showToast(params.get('message') || 'Jobber authorization failed.', 'error')
+      }
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (activeTab !== 'integrations') return
+    apiRequest('/api/sales/integrations/jobber/status')
+      .then((data) => setJobberStatus(data ?? null))
+      .catch(() => setJobberStatus({ connected: false, expiresAt: null }))
+  }, [activeTab])
+
+  async function handleConnectJobber() {
+    setIsConnecting(true)
+    try {
+      const data = await apiRequest('/api/sales/integrations/jobber/connect')
+      window.location.href = data.authUrl
+    } catch (err) {
+      showToast(err?.message || 'Failed to start Jobber authorization.', 'error')
+      setIsConnecting(false)
+    }
+  }
 
   function clearMessages() {
     setError('')
@@ -490,6 +532,56 @@ function SettingsPage() {
               <Button type="button" onClick={saveQuoteDefaults} disabled={isSaving} className="h-10 px-5">
                 {isSaving ? 'Saving...' : 'Save Defaults'}
               </Button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'integrations' && profile.role === 'admin' && (
+          <div>
+            <SectionHeader
+              title="Integrations"
+              description="Manage connections to external services."
+            />
+            <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#262742]/10">
+                    <Plug className="h-4 w-4 text-[#262742]" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-zinc-900">Jobber</p>
+                    <p className="mt-0.5 text-sm text-zinc-500">Field service management — quotes and client sync</p>
+                    {jobberStatus === null ? (
+                      <p className="mt-1 text-sm text-zinc-400">Checking status…</p>
+                    ) : jobberStatus.connected ? (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        <span className="text-sm text-emerald-700">
+                          Connected
+                          {jobberStatus.expiresAt && (
+                            <span className="text-zinc-500">
+                              {' '}— token expires {new Date(jobberStatus.expiresAt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <XCircle className="h-4 w-4 text-zinc-400" />
+                        <span className="text-sm text-zinc-500">Not connected</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleConnectJobber}
+                  disabled={isConnecting}
+                  className="h-9 shrink-0 px-4"
+                >
+                  {isConnecting ? 'Connecting…' : jobberStatus?.connected ? 'Reconnect Jobber' : 'Connect Jobber'}
+                </Button>
+              </div>
             </div>
           </div>
         )}
