@@ -16,7 +16,7 @@ function resolveApiBaseUrl() {
   return 'http://localhost:8080'
 }
 
-const API_BASE_URL = resolveApiBaseUrl()
+export const API_BASE_URL = resolveApiBaseUrl()
 const AUTH_PATH_PREFIX = '/auth/'
 let refreshInFlight = null
 

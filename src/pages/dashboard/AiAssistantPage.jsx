@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatFieldName, useToast } from '@/components/ui/toast'
-import { apiRequest } from '@/lib/apiClient'
+import { apiRequest, API_BASE_URL } from '@/lib/apiClient'
 import { dollarsToCents } from '@/lib/pricingMoney'
 import { Bot, Copy, FileText, History, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -617,6 +617,21 @@ function AiAssistantPage() {
   function scrollToLatest(behavior = 'smooth') {
     chatBottomRef.current?.scrollIntoView({ behavior, block: 'end' })
   }
+
+  useEffect(() => {
+    function saveSnapshot() {
+      fetch(`${API_BASE_URL}/api/sales/ai-assistant/snapshot`, {
+        method: 'POST',
+        credentials: 'include',
+        keepalive: true,
+      }).catch(() => {})
+    }
+    window.addEventListener('beforeunload', saveSnapshot)
+    return () => {
+      window.removeEventListener('beforeunload', saveSnapshot)
+      saveSnapshot()
+    }
+  }, [])
 
   useEffect(() => {
     const hasResumeQuote = Boolean(location.state?.resumeQuoteId) || Boolean(location.state?.quoteContinueMeta)
