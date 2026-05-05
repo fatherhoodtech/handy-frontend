@@ -2,7 +2,7 @@ name: Deploy Frontend
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 jobs:
@@ -19,15 +19,29 @@ jobs:
           command_timeout: 30m
           script: |
             set -e
+            BRANCH="${{ github.ref_name }}"
 
-            # Clone repo on first deploy, pull on subsequent ones
-            if [ ! -d /root/handy-frontend ]; then
-              git clone https://x-access-token:${{ secrets.DEPLOY_REPO_PAT }}@github.com/fatherhoodtech/handy-frontend.git /root/handy-frontend
+            if [ "$BRANCH" = "main" ]; then
+              FRONTEND_DIR=/root/handy-frontend
+              DEPLOY_DIR=/root/Handy-Dudes-Node-Quote-Engine/deploy/handy.us.eqv.rw
             else
-              cd /root/handy-frontend
-              git pull https://x-access-token:${{ secrets.DEPLOY_REPO_PAT }}@github.com/fatherhoodtech/handy-frontend.git main
+              FRONTEND_DIR=/root/handy-frontend-staging
+              DEPLOY_DIR=/root/Handy-Dudes-Node-Quote-Engine-staging/deploy/staging.handy.us.eqv.rw
             fi
 
-            cd /root/Handy-Dudes-Node-Quote-Engine/deploy/handy.us.eqv.rw
+            # Clone frontend repo if first deploy, otherwise pull latest
+            if [ ! -d "$FRONTEND_DIR" ]; then
+              git clone -b $BRANCH https://x-access-token:${{ secrets.DEPLOY_REPO_PAT }}@github.com/fatherhoodtech/handy-frontend.git $FRONTEND_DIR
+            else
+              cd $FRONTEND_DIR
+              git pull https://x-access-token:${{ secrets.DEPLOY_REPO_PAT }}@github.com/fatherhoodtech/handy-frontend.git $BRANCH
+            fi
+
+            # Ensure the backend repo (and its compose file) is present for staging
+            if [ "$BRANCH" != "main" ] && [ ! -d "$DEPLOY_DIR" ]; then
+              git clone -b $BRANCH https://x-access-token:${{ secrets.DEPLOY_REPO_PAT }}@github.com/fatherhood-Tech/Handy-Dudes-Node-Quote-Engine.git /root/Handy-Dudes-Node-Quote-Engine-staging
+            fi
+
+            cd $DEPLOY_DIR
             docker compose build frontend
             docker compose up -d frontend
