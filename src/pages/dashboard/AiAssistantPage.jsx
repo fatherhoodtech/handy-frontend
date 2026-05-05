@@ -1905,6 +1905,14 @@ function AiAssistantPage() {
                           <label className="text-xs font-semibold text-zinc-600">Line Total ($)</label>
                           <Input value={`$${(toInt(item.totalPriceCents) / 100).toFixed(2)}`} disabled />
                         </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-semibold text-zinc-600">Notes</label>
+                          <Input
+                            value={item.notes ?? ''}
+                            placeholder="Why is this item needed?"
+                            onChange={(event) => updateLineItem(index, 'notes', event.target.value)}
+                          />
+                        </div>
                         <div className="sm:col-span-2">
                           <Button type="button" variant="outline" className="bg-zinc-100 hover:bg-zinc-200" onClick={() => removeLineItem(index)}>
                             Remove Item

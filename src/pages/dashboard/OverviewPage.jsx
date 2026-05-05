@@ -8,15 +8,6 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar,
 } from 'recharts'
 
-const weeklyActivity = [
-  { day: 'Mon', quotes: 5, valueCents: 320000 },
-  { day: 'Tue', quotes: 8, valueCents: 540000 },
-  { day: 'Wed', quotes: 4, valueCents: 280000 },
-  { day: 'Thu', quotes: 11, valueCents: 720000 },
-  { day: 'Fri', quotes: 7, valueCents: 460000 },
-  { day: 'Sat', quotes: 3, valueCents: 190000 },
-  { day: 'Sun', quotes: 2, valueCents: 120000 },
-]
 
 function StatCard({ label, value, sub, icon: Icon, iconBg, iconColor, onClick }) {
   return (
@@ -70,6 +61,7 @@ function OverviewPage() {
   const [, setOverviewMessage] = useState('')
   const [alerts, setAlerts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [weeklyActivity, setWeeklyActivity] = useState([])
   const [metrics, setMetrics] = useState({
     quotesCreatedToday: 0,
     quotesApprovedToday: 0,
@@ -100,6 +92,9 @@ function OverviewPage() {
               requestsOpen: m.requestsOpen ?? m.opportunitiesOpen ?? 0,
               opportunitiesOpen: m.opportunitiesOpen ?? m.requestsOpen ?? 0,
             })
+          }
+          if (Array.isArray(overview?.weeklyActivity)) {
+            setWeeklyActivity(overview.weeklyActivity)
           }
         }
       } catch {
@@ -175,6 +170,9 @@ function OverviewPage() {
               This week
             </span>
           </div>
+          {isLoading ? (
+            <div className="flex h-[210px] items-center justify-center text-sm text-slate-400">Loading…</div>
+          ) : (
           <ResponsiveContainer width="100%" height={210}>
             <AreaChart data={weeklyActivity} margin={{ top: 5, right: 4, bottom: 0, left: -18 }}>
               <defs>
@@ -198,6 +196,7 @@ function OverviewPage() {
               />
             </AreaChart>
           </ResponsiveContainer>
+          )}
         </div>
 
         {/* Donut — pipeline status */}
@@ -257,6 +256,9 @@ function OverviewPage() {
             <h2 className="font-semibold text-slate-900">Weekly Revenue</h2>
             <p className="mt-0.5 text-xs text-slate-400">Approved quote value — last 7 days</p>
           </div>
+          {isLoading ? (
+            <div className="flex h-[180px] items-center justify-center text-sm text-slate-400">Loading…</div>
+          ) : (
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={weeklyActivity} margin={{ top: 5, right: 4, bottom: 0, left: -18 }} barSize={28}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -271,6 +273,7 @@ function OverviewPage() {
               <Bar dataKey="valueCents" fill="#262742" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          )}
         </div>
 
         {/* Recent alerts */}
